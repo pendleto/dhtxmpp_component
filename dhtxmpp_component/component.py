@@ -21,6 +21,7 @@ from collections import Counter
 
 from protocol import custom_protocol
 from dht import DHT
+from mdns import mdns_service
 
 def most_common(lst):
     data = Counter(lst)
@@ -61,6 +62,18 @@ class dhtxmpp_component(ComponentXMPP):
         # The message event is triggered whenever a message
         # stanza is received. Be aware that that includes
         # MUC messages and error messages.
+        
+        if bootstrapip == None:
+            # Run the mdns to discover dht
+            self.mdns = mdns_service()
+            dht_address = self.mdns.listen_for_service()
+        
+            if dht_address == None:
+                self.mdns.register_dht_with_mdns()
+                bootstrapip = "127.0.0.1"
+            else:
+                bootstrapip = str(dht_address)
+            
         self.dht = DHT(bootstrapip, self)
         self.add_event_handler('presence_probe', self.handle_probe)
         self.add_event_handler("message", self.message)
@@ -316,12 +329,13 @@ if __name__ == '__main__':
         opts.server = raw_input("Server: ")
     if opts.port is None:
         opts.port = int(raw_input("Port: "))
-    if opts.bootstrapip is None:
-        opts.port = raw_input("Bootstrap IP: ")
+    #if opts.bootstrapip is None:
+    #    opts.bootstrapip = raw_input("Bootstrap IP: ")
         
     # Setup logging.
     logging.basicConfig(level=opts.loglevel,
                         format='%(levelname)-8s %(message)s')
+
 
     # Setup the dhtxmpp_component and register plugins. Note that while plugins
     # may have interdependencies, the order in which you register them does
@@ -335,7 +349,9 @@ if __name__ == '__main__':
     xmpp.auto_subscribe = True
 
     # Connect to the XMPP server and start processing XMPP stanzas.
+    print("Connecting to XMPP server...")
     if xmpp.connect():
+        print("Connected")
         xmpp.process(block=False)
         xmpp.run()
         xmpp.disconnect()

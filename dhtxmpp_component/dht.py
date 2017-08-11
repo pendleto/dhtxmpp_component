@@ -34,6 +34,7 @@ class DHT():
 
     def quit(self, result):
         log.msg("quit result: %s" % result)
+        self.mdns.unregister_dht_with_mdns()
         reactor.stop()
 
     def done(self, found, server):
