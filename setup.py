@@ -12,5 +12,5 @@ setup(
     url="http://github.com/movsoftware/dhtxmppcomponent",
     packages=find_packages(),
     requires=["sleekxmpp", "kademlia", "zeroconf"],
-    install_requires=[]
+    install_requires=["sleekxmpp", "kademlia", "zeroconf"]
 )

@@ -1,0 +1,21 @@
+- Install prosody XMPP server
+	- apt-get install prosody
+	- Add dhtxmppcomponent compnent configlet to /etc/prosody/prosody.cfg.lua:
+	
+	Component "mesh.localhost"
+        component_secret = "dhtxmppcomponentsecret"
+
+- Add a user to the prosody XMPP server
+	- sudo prosodyctl adduser pi@localhost
+	
+- Install dhtxmppcomponent
+	- sudo pip install dhtxmpp_component.0.1.tar.gz
+	- sudo cp dhtxmpp_componentd.py /usr/local/bin
+	- sudo chmod a+x /usr/local/bin/dhtxmpp_componentd.py
+	- sudo cp dhtxmpp-component.sh to /etc/init.d
+	- sudo update-rc.d dhtxmpp-component.sh defaults
+	
+- Reboot pi or:
+	- sudo prosodyctl start
+	- sudo /etc/init.d/dhtxmpp-component.sh start
+	

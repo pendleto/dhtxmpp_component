@@ -35,10 +35,10 @@ class custom_protocol(KademliaProtocol, object):
      
     @staticmethod         
     def crack_msg(msg):
-        msg_list = msg.split(":")
+        msg_list = msg.split(':')
         from_user_key = msg_list[1]
         to_user_key = msg_list[2] 
-        msg_body = msg_list[3]
+        msg_body = ':'.join(msg_list[3:])
         return from_user_key, to_user_key, msg_body
         
     @staticmethod         
