@@ -7,13 +7,11 @@
 """
 
 from kademlia.protocol import KademliaProtocol
-from routing import custom_routing_table
 
 class custom_protocol(KademliaProtocol, object):
     
     def __init__(self, dht, server):
         super(custom_protocol, self).__init__(server.node, server.storage, server.ksize)
-        self.router = custom_routing_table(dht, server.protocol.router, server.protocol.router.ksize, server.protocol.router.node)
         self.dht = dht 
         
     @staticmethod         
@@ -58,9 +56,6 @@ class custom_protocol(KademliaProtocol, object):
         # if it is, then deliver the XMPP message
         # otherwise just store it
         value_str = str(value)
-        
-        print("RPC_STORE:%s\n" % str(value_str))
-               
         self.dht.xmpp.parse_dht_msg(value_str)
         
         super(custom_protocol, self).rpc_store(sender, nodeid, key, value)

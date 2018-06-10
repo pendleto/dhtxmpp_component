@@ -1,4 +1,3 @@
-
 #!/bin/sh
 
 ### BEGIN INIT INFO
@@ -16,7 +15,7 @@ DAEMON=$DIR/dhtxmpp_componentd.py
 DAEMON_NAME=dhtxmpp-component
 
 # Add any command line options for your daemon here
-DAEMON_OPTS="-j mesh.localhost -p dhtxmppcomponentsecret -s 127.0.0.1 -P 5347 -d"
+DAEMON_OPTS="-j mesh.localhost -p dhtxmppcomponentsecret -s 127.0.0.1 -P 5347 -q"
 
 # This next line determines what user the script runs as.
 # Root generally not recommended but necessary if you are using the Raspberry Pi GPIO from Python.

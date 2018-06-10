@@ -7,11 +7,15 @@
 """
 
 import sys
-from twisted.internet import reactor
+import asyncio
 from collections import Counter
-from protocol import custom_protocol
-from twisted.python import log
-from server import custom_server
+from dhtxmpp_component.protocol import custom_protocol
+from kademlia.network import Server
+import logging
+
+log = logging.getLogger('dhtxmpp_component')
+log.setLevel(logging.DEBUG)
+log.addHandler(logging.StreamHandler())
 
 def most_common(lst):
     data = Counter(lst)
@@ -21,21 +25,31 @@ class DHT():
 
     def __init__(self, bootstrapip, xmpp):
         # log to std out
-        log.startLogging(sys.stdout)
-        self.server = custom_server()
+        self.bootstrapip = bootstrapip
+        self.server = Server()
         self.server.protocol = custom_protocol(self, self.server)
         self.server.listen(5678)
-        self.server.bootstrap([(bootstrapip, 5678)]).addCallback(self.bootstrapDone, self.server)
+        
         self.myip = None
         self.xmpp = xmpp
 
     def run(self):
-        reactor.run()
+        self.loop = asyncio.get_event_loop()
+        self.loop.set_debug(True)
+        self.loop.run_until_complete(self.server.bootstrap([(self.bootstrapip, 5678)]))
+        try:
+            self.loop.run_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.server.stop()
+            self.loop.close()
 
     def quit(self, result):
         log.msg("quit result: %s" % result)
         self.mdns.unregister_dht_with_mdns()
-        reactor.stop()
+        self.server.stop()
+        self.loop.close()
 
     def done(self, found, server):
         log.msg("Found nodes: %s" % found)
@@ -44,7 +58,7 @@ class DHT():
         # check that it got a result back
         # print str(server.node.long_id)
         if not len(ip_list):
-            print "Could not determine my ip"
+            print ("Could not determine my ip")
         if len(ip_list) > 0:
             self.myip = most_common(ip_list)
             print ("found my ip = %s" % str(self.myip))
@@ -52,12 +66,6 @@ class DHT():
 
     def get_visible_ip(self):
         self.server.inetVisibleIP().addCallback(self.get_visible_ip_callback, self.server)
-
-    def bootstrapDone(self, found, server):
-        if len(found) == 0:
-            print "Could not connect to the bootstrap server."
-            reactor.stop()
-            exit(0)
 
     def findneighbors(self):
         return self.server.bootstrappableNeighbors()

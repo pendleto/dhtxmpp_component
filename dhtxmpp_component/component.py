@@ -19,9 +19,9 @@ from sleekxmpp.xmlstream.matcher import StanzaPath
 
 from collections import Counter
 
-from protocol import custom_protocol
-from dht import DHT
-from mdns import mdns_service
+from dhtxmpp_component.protocol import custom_protocol
+from dhtxmpp_component.dht import DHT
+from dhtxmpp_component.mdns import mdns_service
 
 def most_common(lst):
     data = Counter(lst)
@@ -259,7 +259,8 @@ class dhtxmpp_component(ComponentXMPP):
             
  
     def send_msg_to_dht(self, to, msg):
-        key = hashlib.sha1(str(to)+str(msg)).digest()
+        msgstr = str(to) + str(msg)
+        key = hashlib.sha1(msgstr.encode('utf-8')).digest()
         self.dht.server.set(key, msg)
                    
     def parse_dht_msg(self, value_str):         

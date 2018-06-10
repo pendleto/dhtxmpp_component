@@ -11,6 +11,6 @@ setup(
     license="MIT",
     url="http://github.com/movsoftware/dhtxmppcomponent",
     packages=find_packages(),
-    requires=["sleekxmpp", "kademlia", "zeroconf"],
-    install_requires=["sleekxmpp", "kademlia", "zeroconf"]
+    requires=["sleekxmpp", "kademlia", "zeroconf", "asyncio"],
+    install_requires=["sleekxmpp", "kademlia", "zeroconf", "asyncio"]
 )

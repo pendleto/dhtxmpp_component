@@ -25,8 +25,8 @@ def get_ip():
 class mdns_service(object):
     
     def register_dht_with_mdns(self):
-        logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger('zeroconf').setLevel(logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger('zeroconf').setLevel(logging.INFO)
 
         service_name = 'dht'
         desc = {'service': service_name, 'version': '0.0.1'}
@@ -55,7 +55,7 @@ class mdns_service(object):
             cache=zeroconf.cache.cache
             # list all known hosts in .local
             for key in cache.keys():
-                if isinstance(cache[key][0],DNSAddress):
+                if len(cache[key]) and isinstance(cache[key][0],DNSAddress):
                     #print(key,cache[key])
                     self.service_address = cache[key][0]
 
