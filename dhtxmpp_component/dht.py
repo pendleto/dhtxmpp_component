@@ -8,9 +8,10 @@
 
 import sys
 import asyncio
+from kademlia.network import Server
 from collections import Counter
 from dhtxmpp_component.protocol import custom_protocol
-from kademlia.network import Server
+
 import logging
 
 log = logging.getLogger('dhtxmpp_component')
@@ -21,15 +22,19 @@ def most_common(lst):
     data = Counter(lst)
     return data.most_common(1)[0][0]
 
+class dhtxmpp_server(Server):
+    protocol_class = custom_protocol
+    def __init__(self):
+        Server.__init__(self)
+    
 class DHT():
 
     def __init__(self, bootstrapip, xmpp):
         # log to std out
         self.bootstrapip = bootstrapip
-        self.server = Server()
-        self.server.protocol = custom_protocol(self, self.server)
+        self.server = dhtxmpp_server()
         self.server.listen(5678)
-        
+        self.server.protocol.dht = self        
         self.myip = None
         self.xmpp = xmpp
 
@@ -54,6 +59,15 @@ class DHT():
     def done(self, found, server):
         log.msg("Found nodes: %s" % found)
 
+    def set(self, key, value):
+        # Create a new loop
+        new_loop = asyncio.new_event_loop()
+        # Give it some async work
+        future = asyncio.run_coroutine_threadsafe(
+            self.server.set(key, str(value)), 
+            self.loop
+            )
+                
     def get_visible_ip_callback(self, ip_list, server):
         # check that it got a result back
         # print str(server.node.long_id)

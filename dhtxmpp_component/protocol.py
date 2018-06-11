@@ -8,11 +8,8 @@
 
 from kademlia.protocol import KademliaProtocol
 
-class custom_protocol(KademliaProtocol, object):
+class custom_protocol(KademliaProtocol):
     
-    def __init__(self, dht, server):
-        super(custom_protocol, self).__init__(server.node, server.storage, server.ksize)
-        self.dht = dht 
         
     @staticmethod         
     def create_msg(from_user_key, to_user_key, msg_body):
@@ -30,7 +27,6 @@ class custom_protocol(KademliaProtocol, object):
         msg_type = msg_list[0]
         return msg_type 
     
-     
     @staticmethod         
     def crack_msg(msg):
         msg_list = msg.split(':')
@@ -48,14 +44,15 @@ class custom_protocol(KademliaProtocol, object):
     
     @staticmethod    
     def create_user_key(user_name, node_id):
-        return user_name # + "_" + node_id
-                
+        return user_name # + "_" + node_id            
+    
     def rpc_store(self, sender, nodeid, key, value):
         
         # check if value is meant for this node
         # if it is, then deliver the XMPP message
         # otherwise just store it
         value_str = str(value)
+        print("RECEIVED VALUE=%s" % (value_str))
         self.dht.xmpp.parse_dht_msg(value_str)
         
         super(custom_protocol, self).rpc_store(sender, nodeid, key, value)

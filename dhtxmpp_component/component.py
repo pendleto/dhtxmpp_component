@@ -37,16 +37,13 @@ if sys.version_info < (3, 0):
 else:
     raw_input = input
 
-
-
 def create_jid(user_key):
     j = JID()
     j.user = str(user_key)
     j.domain = "mesh.localhost"
     #j.resource = str(node_id)
     return j
-
-
+            
 class dhtxmpp_component(ComponentXMPP):
 
     """
@@ -261,7 +258,7 @@ class dhtxmpp_component(ComponentXMPP):
     def send_msg_to_dht(self, to, msg):
         msgstr = str(to) + str(msg)
         key = hashlib.sha1(msgstr.encode('utf-8')).digest()
-        self.dht.server.set(key, msg)
+        self.dht.set(key, str(msg))
                    
     def parse_dht_msg(self, value_str):         
         
