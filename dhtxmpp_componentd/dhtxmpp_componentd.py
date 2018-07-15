@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import time
@@ -26,18 +26,18 @@ class dhtxmpp_componentd:
         xmpp.auto_subscribe = True
 
         # Connect to the XMPP server and start processing XMPP stanzas.
-        print("Connecting to XMPP server...")
+        logging.debug("Connecting to XMPP server...")
         if xmpp.connect():
-            print("Connected")
+            logging.debug("Connected")
             xmpp.process(block=False)
             xmpp.run()
             xmpp.disconnect()
-            print("Done")
+            logging.debug("Done")
         else:
-            print("Unable to connect.")
+            logging.debug("Unable to connect.")
 
 
-if __name__ == "__main__":    
+def main():    
         # Setup the command line arguments.
     optp = OptionParser()
 
@@ -67,9 +67,11 @@ if __name__ == "__main__":
     opts, args = optp.parse_args()
 
     # Setup logging.
-    logging.basicConfig(level=opts.loglevel,
-                        format='%(levelname)-8s %(message)s')
-
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(pathname)s %(asctime)s %(levelname)s %(message)s',
+                    filename='/var/log/dhtxmpp_componentd.log',
+                    filemode='w',
+                    )
 
  
     daemon = dhtxmpp_componentd()

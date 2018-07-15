@@ -52,7 +52,6 @@ class custom_protocol(KademliaProtocol):
         # if it is, then deliver the XMPP message
         # otherwise just store it
         value_str = str(value)
-        print("RECEIVED VALUE=%s" % (value_str))
         self.dht.xmpp.parse_dht_msg(value_str)
         
         super(custom_protocol, self).rpc_store(sender, nodeid, key, value)

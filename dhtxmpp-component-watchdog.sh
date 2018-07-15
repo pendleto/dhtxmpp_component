@@ -1,22 +1,22 @@
 #!/bin/sh
 
 ### BEGIN INIT INFO
-# Provides:          dhtxmpp_componentd
+# Provides:          dhtxmpp_componentd_watchdog
 # Required-Start:    $remote_fs $syslog prosody
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: DHTXMPP Component
-# Description:       DHTXMPP Component
+# Short-Description: DHTXMPP Component Watchdog
+# Description:       DHTXMPP Component Watchdog
 ### END INIT INFO
 
 DIR=/usr/local/bin
-DAEMON=$DIR/dhtxmpp_componentd
-DAEMON_NAME=dhtxmpp-component
+DAEMON=$DIR/dhtxmpp_componentd_watchdog
+DAEMON_NAME=dhtxmpp-component-watchdog
 DAEMON_USER=root
 
 # Add any command line options for your daemon here
-DAEMON_OPTS="-j mesh.localhost -p dhtxmppcomponentsecret -s 127.0.0.1 -P 5347 -q"
+DAEMON_OPTS="-j watchdog@localhost -p dhtxmppcomponentsecret -t mesh.localhost"
 
 # The process ID of the script when it runs is stored here:
 PIDFILE=/var/run/$DAEMON_NAME.pid

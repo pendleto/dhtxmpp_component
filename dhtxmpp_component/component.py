@@ -106,7 +106,7 @@ class dhtxmpp_component(ComponentXMPP):
 
         to_user_key = custom_protocol.create_user_key(str(to_jid.user), None)
         from_user_key = custom_protocol.create_user_key(str(from_jid.user), str(self.dht.server.node.long_id))   
-        print("SENDING MSG TO KEY: %s=%s" % (str(to_user_key), str(msg_body)))
+        logging.debug("SENDING MSG TO KEY: %s=%s" % (str(to_user_key), str(msg_body)))
         fullmsg = custom_protocol.create_msg(from_user_key, to_user_key, msg_body)
         self.send_msg_to_dht(to_user_key, fullmsg)        
         
@@ -121,7 +121,7 @@ class dhtxmpp_component(ComponentXMPP):
         from_jid = JID(presence['from'])
         self.local_jid = from_jid
         self.local_user_key = custom_protocol.create_user_key(str(from_jid.user), str(self.dht.server.node.long_id))   
-        print("got presence from: %s" % (str(from_jid)))
+        logging.debug("got presence from: %s" % (str(from_jid)))
         self.sendPresence(pshow='available', pto=from_jid)
         # go through all items in the component roster send the presence ones to the local client
         self.send_roster()
@@ -137,14 +137,14 @@ class dhtxmpp_component(ComponentXMPP):
         # The reply method will use the messages 'to' JID as the
         # outgoing reply's 'from' JID.
         from_jid = JID(presence['from'])        
-        print("got unpresence from: %s" % (str(from_jid)))
+        logging.debug("got unpresence from: %s" % (str(from_jid)))
         self.unpublish_jid_to_dht() 
         self.local_jid = None
         self.local_user_key = None
                
     def disco_info(self, iq):
         from_jid = JID(iq['from'])
-        print("got disco_info from: %s" % (str(from_jid)))
+        logging.debug("got disco_info from: %s" % (str(from_jid)))
         #component_jid = JID("mesh.localhost")
         #self.send_presence_subscription(pto=from_jid, pfrom=component_jid)     
         
@@ -153,9 +153,9 @@ class dhtxmpp_component(ComponentXMPP):
         # a new jid is found on the network
         # send it to the local client
         if from_jid == None:
-            print("Couldn't find JID")
+            logging.debug("Couldn't find JID")
             return
-        print("New JID %s found on DHT" % (str(from_jid)))
+        logging.debug("New JID %s found on DHT" % (str(from_jid)))
         to_jid = self.local_jid
         
         # Go through the jids on our roster and send their presences to 
@@ -164,7 +164,7 @@ class dhtxmpp_component(ComponentXMPP):
         # check if this jid is already on our roster
         existing = self.client_roster.has_jid(from_jid)
         if existing == True:
-            print("%s already exists in our roster" % (str(from_jid)))
+            logging.debug("%s already exists in our roster" % (str(from_jid)))
             self.sendPresence(pshow='available', pto=to_jid, pfrom=from_jid)
             presence = self.make_presence(pshow='available', pfrom=from_jid)
             self.client_roster[from_jid].handle_available(presence)
@@ -172,7 +172,7 @@ class dhtxmpp_component(ComponentXMPP):
         
 
         if to_jid != None:
-            print("Sending presence to %s from %s" % (str(to_jid), str(from_jid)))
+            logging.debug("Sending presence to %s from %s" % (str(to_jid), str(from_jid)))
             self.send_presence_subscription(pto=to_jid, pfrom=from_jid)
             #self.sendPresence(pshow='available', pto=to_jid, pfrom=mesh_jid)
             self.client_roster.add(str(from_jid))
@@ -183,18 +183,18 @@ class dhtxmpp_component(ComponentXMPP):
         # a jid has left the network
         # send it to the local client
         if from_jid == None:
-            print("Couldn't find JID")
+            logging.debug("Couldn't find JID")
             return
-        print("JID %s left the DHT" % (str(from_jid)))
+        logging.debug("JID %s left the DHT" % (str(from_jid)))
         to_jid = self.local_jid
         # check if this jid is already on our roster
         existing = self.client_roster.has_jid(from_jid)
         if existing == False:
-            print("%s doesn't exist in our roster" % (str(from_jid)))
+            logging.debug("%s doesn't exist in our roster" % (str(from_jid)))
             return
     
         if to_jid != None:
-            print("Sending unavailable presence to %s from %s" % (str(to_jid), str(from_jid)))
+            logging.debug("Sending unavailable presence to %s from %s" % (str(to_jid), str(from_jid)))
             #self.send_presence_subscription(pto=to_jid, pfrom=from_jid, ptype='unsubscribe')
             self.sendPresence(pshow='unavailable', pto=to_jid, pfrom=from_jid)
             #self.client_roster.remove(str(from_jid))
@@ -210,16 +210,16 @@ class dhtxmpp_component(ComponentXMPP):
                 sub = self.client_roster[jid]['subscription']
                 name = self.client_roster[jid]['name']
                 if self.client_roster[jid]['name']:
-                    print(' %s (%s) [%s]' % (name, jid, sub))
+                    logging.debug(' %s (%s) [%s]' % (name, jid, sub))
                 else:
-                    print(' %s [%s]' % (jid, sub))
+                    logging.debug(' %s [%s]' % (jid, sub))
 
                 connections = self.client_roster.presence(jid)
                 for res, pres in connections.items():
                     show = 'available'
                     if pres['show']:
                         show = pres['show']
-                    print('   - %s (%s)' % (res, show))
+                    logging.debug('   - %s (%s)' % (res, show))
                     status = "available"
                     if pres['status']:
                         status = pres['status']
@@ -239,20 +239,20 @@ class dhtxmpp_component(ComponentXMPP):
             # publish jid.user and node.id
             user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
             msg = custom_protocol.create_presence(user_key, "available")
-            print("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
+            logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
             self.send_msg_to_dht(user_key, msg) 
         else:
-            print("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")      
+            logging.debug("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")      
             
     def unpublish_jid_to_dht(self):
         if self.local_jid != None:            
             # publish jid.user and node.id
             user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
             msg = custom_protocol.create_presence(user_key, "unavailable")
-            print("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
+            logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
             self.send_msg_to_dht(user_key, msg) 
         else:
-            print("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")    
+            logging.debug("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")    
             
  
     def send_msg_to_dht(self, to, msg):
@@ -271,7 +271,7 @@ class dhtxmpp_component(ComponentXMPP):
                 # if this msg is destined for this node
                 if (to_user_key == self.local_user_key):
                     from_jid = create_jid(from_user_key)
-                    print("Sending message %s" % xmpp_msg)
+                    logging.debug("Sending message %s" % xmpp_msg)
                     self.send_message(mto=self.local_jid,
                                        mfrom=from_jid,
                                        mbody=xmpp_msg,
