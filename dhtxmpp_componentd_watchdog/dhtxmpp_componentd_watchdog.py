@@ -12,14 +12,23 @@ from dhtxmpp_component import component
 
 class dhtxmpp_componentd_watchdog:
     
-    def start_component(self, password):
+    def start_component(self):
         try:
-            process = Popen(['start_dhtxmpp_component', password], stdout=PIPE, stderr=PIPE)
+            process = Popen(['/usr/bin/prosodyctl', 'restart'], stdout=PIPE, stderr=PIPE)
+            stdout, stderr = process.communicate()
+        except:
+            logging.debug("Failed to start xmpp server")
+            return False
+        logging.debug("Started xmpp server")
+        
+        try:
+            process = Popen(['/etc/init.d/dhtxmpp-component.sh', 'restart'], stdout=PIPE, stderr=PIPE)
             stdout, stderr = process.communicate()
         except:
             logging.debug("Failed to start component")
             return False
         logging.debug("Started component")
+        
         return True
 
     def _run_ping_test(self, jid, password, pingjid):
@@ -41,11 +50,11 @@ class dhtxmpp_componentd_watchdog:
         
     def run_ping_test(self, jid, password, pingjid):
         num_tries = 0
-        while num_tries < 5:
+        while num_tries < 12:
             num_tries = num_tries + 1
             if self._run_ping_test(jid, password, pingjid) == True:
                 return True
-            time.sleep(30)
+            time.sleep(60)
         return False
         
         
@@ -88,7 +97,7 @@ def main():
         if watchdog.run_ping_test(opts.jid, opts.password, opts.pingjid) == False:
             # restart XMPP server and component
             logging.debug("RESTARTING COMPONENT\n")            
-            watchdog.start_component(opts.password)
+            watchdog.start_component()
         else:
             logging.debug("COMPONENT WORKING\n")            
         time.sleep(120)

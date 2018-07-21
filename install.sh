@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python3 -m pip install dhtxmpp_component-0.1.tar.gz
+python3 -m pip install dist/dhtxmpp_component-0.1.tar.gz
 python3 setup.py install
 cp dhtxmpp-component.sh /etc/init.d
 chmod a+x /etc/init.d/dhtxmpp-component.sh

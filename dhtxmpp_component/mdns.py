@@ -26,8 +26,11 @@ def get_ip():
 class mdns_service(object):
     
     def register_dht_with_mdns(self):
-        logging.basicConfig(level=logging.INFO)
-        logging.getLogger('zeroconf').setLevel(logging.INFO)
+        
+        logging.basicConfig(level=logging.DEBUG,
+                        format='%(pathname)s %(asctime)s %(levelname)s %(message)s',
+                        filename='/var/log/dhtxmpp_componentd_mdns.log',
+                        filemode='w')
 
         service_name = 'dht'
         desc = {'service': service_name, 'version': '0.0.1'}
@@ -66,9 +69,9 @@ class mdns_service(object):
         num_listen_tries = 0
         self.service_address = None
         while(num_listen_tries<10):
-            logging.debug("Listening for mdns dhtxmpp service...")
+            logging.debug("Listening for mdns dhtxmpp service...%d" % (num_listen_tries))
             num_listen_tries += 1          
-            time.sleep(random.randint(10,20))
+            time.sleep(random.randint(30,60))
             
             if self.service_address != None:
                 logging.debug("Found mdns dhtxmpp service on %s" %(str(self.service_address)))

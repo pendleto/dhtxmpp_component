@@ -10,15 +10,17 @@ from kademlia.protocol import KademliaProtocol
 
 class custom_protocol(KademliaProtocol):
     
+    msg_type_msg = "msg"
+    msg_type_prs = "prs"
         
     @staticmethod         
     def create_msg(from_user_key, to_user_key, msg_body):
-        fullmsg = "msg:%s:%s:%s" % (from_user_key, to_user_key, msg_body)
+        fullmsg = "%s:%s:%s:%s" % (custom_protocol.msg_type_msg, from_user_key, to_user_key, msg_body)
         return fullmsg
     
     @staticmethod         
     def create_presence(user_key, status):
-        presence = "prs:%s:%s" % (user_key, status)
+        presence = "%s:%s:%s" % (custom_protocol.msg_type_prs, user_key, status)
         return presence
     
     @staticmethod         

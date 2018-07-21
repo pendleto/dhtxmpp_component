@@ -261,12 +261,14 @@ class dhtxmpp_component(ComponentXMPP):
         self.dht.set(key, str(msg))
                    
     def parse_dht_msg(self, value_str):         
-        
+        logging.debug("PARSING DHT XMPP MESSAGE") 
         msg_type = custom_protocol.crack_msg_type(value_str)
+        logging.debug("PARSING DHT XMPP MESSAGE TYPE %s" % (msg_type)) 
         if msg_type != None:
   
-            if msg_type == "msg":
+            if msg_type == custom_protocol.msg_type_msg:
                 from_user_key, to_user_key, xmpp_msg = custom_protocol.crack_msg(value_str)
+                logging.debug("XMPP MESSAGE TYPE TO %s LOCAL %s" % (to_user_key, self.local_user_key)) 
                 
                 # if this msg is destined for this node
                 if (to_user_key == self.local_user_key):
@@ -278,7 +280,7 @@ class dhtxmpp_component(ComponentXMPP):
                                        mtype='chat')
                     
                 
-            elif msg_type == "prs":
+            elif msg_type == custom_protocol.msg_type_prs:
                 from_user_key, presence = custom_protocol.crack_presence(value_str)
                 # if this msg is not from this node                
                 if (from_user_key != self.local_user_key):
