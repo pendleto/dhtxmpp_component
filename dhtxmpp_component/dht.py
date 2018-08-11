@@ -60,14 +60,20 @@ class DHT():
         log.msg("Found nodes: %s" % found)
 
     def set(self, key, value):
-        # Create a new loop
-        new_loop = asyncio.new_event_loop()
         # Give it some async work
+        log.debug("SETTING KEY %s ON NETWORK" % (str(key)))
         future = asyncio.run_coroutine_threadsafe(
             self.server.set(key, str(value)), 
             self.loop
             )
-                
+
+    def get(self, key):
+        loop = asyncio.new_event_loop()
+        log.debug("GETTING KEY %s OFF NETWORK" % (str(key)))
+        result = loop.run_until_complete(self.server.get(key))
+        log.debug("GOT VALUE %s OFF NETWORK" % (str(result)))
+        return result
+                        
     def get_visible_ip_callback(self, ip_list, server):
         # check that it got a result back
         # print str(server.node.long_id)

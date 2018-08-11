@@ -20,6 +20,7 @@ DAEMON_OPTS="-j mesh.localhost -p dhtxmppcomponentsecret -s 127.0.0.1 -P 5347 -q
 
 # The process ID of the script when it runs is stored here:
 PIDFILE=/var/run/$DAEMON_NAME.pid
+
 . /lib/lsb/init-functions
 
 do_start () {

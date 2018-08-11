@@ -12,7 +12,10 @@ class custom_protocol(KademliaProtocol):
     
     msg_type_msg = "msg"
     msg_type_prs = "prs"
-        
+    def __init__(self, sourceNode, storage, ksize):
+        KademliaProtocol.__init__(self, sourceNode, storage, ksize)
+        self._waitTimeout = 10
+                
     @staticmethod         
     def create_msg(from_user_key, to_user_key, msg_body):
         fullmsg = "%s:%s:%s:%s" % (custom_protocol.msg_type_msg, from_user_key, to_user_key, msg_body)
@@ -48,12 +51,5 @@ class custom_protocol(KademliaProtocol):
     def create_user_key(user_name, node_id):
         return user_name # + "_" + node_id            
     
-    def rpc_store(self, sender, nodeid, key, value):
-        
-        # check if value is meant for this node
-        # if it is, then deliver the XMPP message
-        # otherwise just store it
-        value_str = str(value)
-        self.dht.xmpp.parse_dht_msg(value_str)
-        
+    def rpc_store(self, sender, nodeid, key, value):        
         super(custom_protocol, self).rpc_store(sender, nodeid, key, value)

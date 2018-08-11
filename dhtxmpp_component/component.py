@@ -63,13 +63,14 @@ class dhtxmpp_component(ComponentXMPP):
         if bootstrapip == None:
             # Run the mdns to discover dht
             self.mdns = mdns_service()
-            dht_address = self.mdns.listen_for_service()
-        
-            if dht_address == None:
-                self.mdns.register_dht_with_mdns()
+            dht_address = self.mdns.listen_for_service()        
+            if dht_address == None:                
                 bootstrapip = "127.0.0.1"
             else:
                 bootstrapip = str(dht_address)
+        if bootstrapip == "127.0.0.1":
+            self.mdns.register_dht_with_mdns()
+            
             
         self.dht = DHT(bootstrapip, self)
         self.add_event_handler('presence_probe', self.handle_probe)
@@ -127,6 +128,13 @@ class dhtxmpp_component(ComponentXMPP):
         self.send_roster()
         #self.dht.server.refreshAllTable()
         self.publish_jid_to_dht()
+        #get all the messages
+        local_user_key = custom_protocol.create_user_key(str(self.local_jid.user), None)
+        logging.debug("GETTING MESSAGES FOR %s" % (str(local_user_key)))
+        msg = self.get_msg_from_dht(local_user_key)
+        
+        if msg != None:
+            self.parse_dht_msg(msg)
                     
     def presence_unavailable(self, presence):
         """
@@ -256,10 +264,16 @@ class dhtxmpp_component(ComponentXMPP):
             
  
     def send_msg_to_dht(self, to, msg):
-        msgstr = str(to) + str(msg)
-        key = hashlib.sha1(msgstr.encode('utf-8')).digest()
+        logging.debug("SENDING MSG TO %s" % (str(to)))
+        key = hashlib.sha1(str(to).encode('utf-8')).digest()
         self.dht.set(key, str(msg))
-                   
+ 
+    def get_msg_from_dht(self, jid):
+        logging.debug("GETTING MSG FROM %s" % (str(jid)))
+        key = hashlib.sha1(str(jid).encode('utf-8')).digest()
+        msg = self.dht.get(key)
+        return msg
+                          
     def parse_dht_msg(self, value_str):         
         logging.debug("PARSING DHT XMPP MESSAGE") 
         msg_type = custom_protocol.crack_msg_type(value_str)

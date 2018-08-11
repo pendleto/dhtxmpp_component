@@ -10,11 +10,11 @@
 - Add a watchdog user to the prosody XMPP server (use password dhtxmppcomponentsecret)
 	- sudo prosodyctl adduser watchdog@localhost
 	
-This package uses Python3
+This package uses Python3.5
 
 - Create dhtxmppcomponent
 	- cd dhtxmpp_component
-	- sh create_egg.sh
+	- sh create_wheel.sh
 	
 - Install dhtxmmpcomponent
     - sudo sh install.sh
