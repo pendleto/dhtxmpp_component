@@ -8,6 +8,7 @@
 
 import sys
 import asyncio
+import random
 from kademlia.network import Server
 from collections import Counter
 from dhtxmpp_component.protocol import custom_protocol
@@ -42,6 +43,8 @@ class DHT():
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
         self.loop.run_until_complete(self.server.bootstrap([(self.bootstrapip, 5678)]))
+        self.heartbeat()
+        
         try:
             self.loop.run_forever()
         except KeyboardInterrupt:
@@ -49,7 +52,25 @@ class DHT():
         finally:
             self.server.stop()
             self.loop.close()
+        
+    def heartbeat(self):
+        logging.debug("Heartbeat dht")
+        asyncio.ensure_future(self._heartbeat())
+        loop = asyncio.get_event_loop()
+        self.refresh_loop = loop.call_later(60, self.heartbeat)
 
+    async def _heartbeat(self):
+        logging.debug("HEARTBEAT START")
+        data = {
+            'neighbors': self.server.bootstrappableNeighbors()
+        }
+        if len(data['neighbors']) == 0:
+            logging.debug("No known neighbors")
+        else:
+            logging.debug(str(data))
+        
+        logging.debug("HEARTBEAT END")
+        
     def quit(self, result):
         log.msg("quit result: %s" % result)
         self.mdns.unregister_dht_with_mdns()

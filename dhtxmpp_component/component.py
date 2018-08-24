@@ -10,6 +10,7 @@ import sys
 import logging
 import getpass
 import hashlib
+import asyncio
 from optparse import OptionParser
 
 from sleekxmpp.componentxmpp import ComponentXMPP
@@ -19,7 +20,7 @@ from sleekxmpp.xmlstream.matcher import StanzaPath
 
 from collections import Counter
 
-from dhtxmpp_component.protocol import custom_protocol
+from dhtxmpp_component.protocol import custom_protocol, dhtxmpp_protocol_msg
 from dhtxmpp_component.dht import DHT
 from dhtxmpp_component.mdns import mdns_service
 
@@ -59,10 +60,9 @@ class dhtxmpp_component(ComponentXMPP):
         # The message event is triggered whenever a message
         # stanza is received. Be aware that that includes
         # MUC messages and error messages.
-        
+        self.mdns = mdns_service()        
         if bootstrapip == None:
             # Run the mdns to discover dht
-            self.mdns = mdns_service()
             dht_address = self.mdns.listen_for_service()        
             if dht_address == None:                
                 bootstrapip = "127.0.0.1"
@@ -82,7 +82,7 @@ class dhtxmpp_component(ComponentXMPP):
                 
         self.local_jid = None
         self.local_user_key = None
-
+    
     def message(self, msg):
         """
         Process incoming message stanzas. Be aware that this also
@@ -108,7 +108,7 @@ class dhtxmpp_component(ComponentXMPP):
         to_user_key = custom_protocol.create_user_key(str(to_jid.user), None)
         from_user_key = custom_protocol.create_user_key(str(from_jid.user), str(self.dht.server.node.long_id))   
         logging.debug("SENDING MSG TO KEY: %s=%s" % (str(to_user_key), str(msg_body)))
-        fullmsg = custom_protocol.create_msg(from_user_key, to_user_key, msg_body)
+        fullmsg = dhtxmpp_protocol_msg.create_msg_str(from_user_key, to_user_key, msg_body)
         self.send_msg_to_dht(to_user_key, fullmsg)        
         
     def presence_available(self, presence):
@@ -246,7 +246,7 @@ class dhtxmpp_component(ComponentXMPP):
         if self.local_jid != None:            
             # publish jid.user and node.id
             user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
-            msg = custom_protocol.create_presence(user_key, "available")
+            msg = dhtxmpp_protocol_msg.create_presence_str(user_key, "available")
             logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
             self.send_msg_to_dht(user_key, msg) 
         else:
@@ -256,7 +256,7 @@ class dhtxmpp_component(ComponentXMPP):
         if self.local_jid != None:            
             # publish jid.user and node.id
             user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
-            msg = custom_protocol.create_presence(user_key, "unavailable")
+            msg = dhtxmpp_protocol_msg.create_presence_str(user_key, "unavailable")
             logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
             self.send_msg_to_dht(user_key, msg) 
         else:
@@ -276,32 +276,32 @@ class dhtxmpp_component(ComponentXMPP):
                           
     def parse_dht_msg(self, value_str):         
         logging.debug("PARSING DHT XMPP MESSAGE") 
-        msg_type = custom_protocol.crack_msg_type(value_str)
+        pmsg = custom_protocol.crack_msg(value_str)
+        msg_type = pmsg.msg_type
         logging.debug("PARSING DHT XMPP MESSAGE TYPE %s" % (msg_type)) 
         if msg_type != None:
   
-            if msg_type == custom_protocol.msg_type_msg:
-                from_user_key, to_user_key, xmpp_msg = custom_protocol.crack_msg(value_str)
-                logging.debug("XMPP MESSAGE TYPE TO %s LOCAL %s" % (to_user_key, self.local_user_key)) 
+            if msg_type == dhtxmpp_protocol_msg.msg_type_msg:
+                
+                logging.debug("XMPP MESSAGE TYPE TO %s LOCAL %s" % (pmsg.to_user_key, self.local_user_key)) 
                 
                 # if this msg is destined for this node
-                if (to_user_key == self.local_user_key):
-                    from_jid = create_jid(from_user_key)
-                    logging.debug("Sending message %s" % xmpp_msg)
+                if (pmsg.to_user_key == self.local_user_key):
+                    from_jid = create_jid(pmsg.from_user_key)
+                    logging.debug("Sending message %s" % pmsg.msg_body)
                     self.send_message(mto=self.local_jid,
                                        mfrom=from_jid,
-                                       mbody=xmpp_msg,
+                                       mbody=pmsg.msg_body,
                                        mtype='chat')
                     
                 
-            elif msg_type == custom_protocol.msg_type_prs:
-                from_user_key, presence = custom_protocol.crack_presence(value_str)
+            elif msg_type == dhtxmpp_protocol_msg.msg_type_prs:    
                 # if this msg is not from this node                
-                if (from_user_key != self.local_user_key):
-                    print ("adding new jid %s" % (str(from_user_key)))
-                    jid = create_jid(from_user_key)
+                if (pmsg.from_user_key != self.local_user_key):
+                    print ("adding new jid %s" % (str(pmsg.from_user_key)))
+                    jid = create_jid(pmsg.from_user_key)
                     
-                    if (presence=="available"):
+                    if (pmsg.presence=="available"):
                         self.on_available_jid_from_dht(jid)  
                     else:
                         self.on_unavailable_jid_from_dht(jid)     
