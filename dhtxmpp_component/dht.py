@@ -9,6 +9,7 @@
 import sys
 import asyncio
 import random
+import threading
 from kademlia.network import Server
 from collections import Counter
 from dhtxmpp_component.protocol import custom_protocol
@@ -38,11 +39,13 @@ class DHT():
         self.server.protocol.dht = self        
         self.myip = None
         self.xmpp = xmpp
-
+        self.num_failures = None
+        
     def run(self):
+        self.num_neighbors = 0
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
-        self.loop.run_until_complete(self.server.bootstrap([(self.bootstrapip, 5678)]))
+        self.loop.run_until_complete(self.bootstrap())
         self.heartbeat()
         
         try:
@@ -50,48 +53,56 @@ class DHT():
         except KeyboardInterrupt:
             pass
         finally:
-            self.server.stop()
-            self.loop.close()
+            logging.debug("CLOSING DHT")
+            self.quit()
+        
+    async def bootstrap(self):
+        self.num_failures = None
+        await self.server.bootstrap([(self.bootstrapip, 5678)])
         
     def heartbeat(self):
-        logging.debug("Heartbeat dht")
+        logging.debug("HEARTBEAT DHT")
         asyncio.ensure_future(self._heartbeat())
         loop = asyncio.get_event_loop()
         self.refresh_loop = loop.call_later(60, self.heartbeat)
 
     async def _heartbeat(self):
-        logging.debug("HEARTBEAT START")
+        logging.debug("HEARTBEAT DHT START")
         data = {
             'neighbors': self.server.bootstrappableNeighbors()
         }
         if len(data['neighbors']) == 0:
-            logging.debug("No known neighbors")
+            if self.num_failures == None:
+                self.num_failures = 1
+            else:
+                self.num_failures = self.num_failures + 1  
+            logging.debug("No known neighbors. Num failures=%d" %(self.num_failures))         
         else:
+            self.num_failures = 0
             logging.debug(str(data))
+            
+        self.num_neighbors = len(data['neighbors'])
         
-        logging.debug("HEARTBEAT END")
+        logging.debug("HEARTBEAT DHT END")
         
-    def quit(self, result):
-        log.msg("quit result: %s" % result)
-        self.mdns.unregister_dht_with_mdns()
+    def quit(self):
+        logging.debug("QUITTING DHT")
+        self.refresh_loop.cancel()
         self.server.stop()
-        self.loop.close()
+        self.loop.stop()
+        logging.debug("QUIT DHT")
 
     def done(self, found, server):
         log.msg("Found nodes: %s" % found)
 
-    def set(self, key, value):
+    async def set(self, key, value):
         # Give it some async work
         log.debug("SETTING KEY %s ON NETWORK" % (str(key)))
-        future = asyncio.run_coroutine_threadsafe(
-            self.server.set(key, str(value)), 
-            self.loop
-            )
-
-    def get(self, key):
-        loop = asyncio.new_event_loop()
+        await self.server.set(key, str(value))
+    
+    async def get(self, key):
         log.debug("GETTING KEY %s OFF NETWORK" % (str(key)))
-        result = loop.run_until_complete(self.server.get(key))
+        result = await self.server.get(key)
         log.debug("GOT VALUE %s OFF NETWORK" % (str(result)))
         return result
                         

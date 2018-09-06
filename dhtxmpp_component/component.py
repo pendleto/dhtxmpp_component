@@ -60,29 +60,80 @@ class dhtxmpp_component(ComponentXMPP):
         # The message event is triggered whenever a message
         # stanza is received. Be aware that that includes
         # MUC messages and error messages.
-        self.mdns = mdns_service()        
-        if bootstrapip == None:
-            # Run the mdns to discover dht
-            dht_address = self.mdns.listen_for_service()        
-            if dht_address == None:                
-                bootstrapip = "127.0.0.1"
-            else:
-                bootstrapip = str(dht_address)
-        if bootstrapip == "127.0.0.1":
-            self.mdns.register_dht_with_mdns()
-            
-            
-        self.dht = DHT(bootstrapip, self)
-        self.add_event_handler('presence_probe', self.handle_probe)
-        self.add_event_handler("message", self.message)
-        self.add_event_handler("presence_available", self.presence_available)
-        self.add_event_handler("presence_unavailable", self.presence_unavailable)
-        self.add_event_handler('disco_info', self.disco_info)        
-        self.register_handler(Callback('Disco Info', StanzaPath('iq/disco_info'), self.disco_info))
-                
+        self.bootstrapip = bootstrapip
         self.local_jid = None
-        self.local_user_key = None
+        self.local_user_key = None   
+        
+    def run(self):        
+        try:
+                registered_dht_with_mdns = False
+                self.mdns = mdns_service()
+                bootstrapip = self.bootstrapip        
+                if self.bootstrapip == None:
+                    # Run the mdns to discover dht
+                    dht_address = self.mdns.listen_for_service()
+                    logging.debug("LISTENED FOR DHT GOT ADDRESS %s" % (str(dht_address)))        
+                    if dht_address == None:                
+                        bootstrapip = "127.0.0.1"
+                    else:
+                        bootstrapip = str(dht_address)
+                    if bootstrapip == "127.0.0.1":
+                        registered_dht_with_mdns = True
+                        self.mdns.register_dht_with_mdns()
+                                   
+                self.dht = DHT(bootstrapip, self)
+                self.add_event_handler('presence_probe', self.handle_probe)
+                self.add_event_handler("message", self.message)
+                self.add_event_handler("presence_available", self.presence_available)
+                self.add_event_handler("presence_unavailable", self.presence_unavailable)
+                self.add_event_handler('disco_info', self.disco_info)        
+                self.register_handler(Callback('Disco Info', StanzaPath('iq/disco_info'), self.disco_info))
+                                
+                self.heartbeat()
+                self.dht.run()
+
+                self.refresh_loop.cancel()
+                
+                if registered_dht_with_mdns == True:
+                    self.mdns.unregister_dht_with_mdns()
+                    
+        except KeyboardInterrupt:
+            pass
+        finally:
+            logging.debug("CLOSING COMPONENT")
+            self.dht.quit() 
     
+   
+    def heartbeat(self):
+        logging.debug("HEARTBEAT COMPONENT")
+        asyncio.ensure_future(self._heartbeat())
+        loop = asyncio.get_event_loop()
+        self.refresh_loop = loop.call_later(60, self.heartbeat)
+
+    async def _heartbeat(self):
+        logging.debug("HEARTBEAT COMPONENT START")
+
+        if self.dht.num_failures == 10:
+            await self.dht.bootstrap()
+            
+        elif self.dht.num_failures == 0:
+            
+            if self.local_jid != None:
+                #get all the messages
+                local_user_key = custom_protocol.create_user_key(str(self.local_jid.user), None)
+                logging.debug("GETTING MESSAGES FOR %s" % (str(local_user_key)))
+                msg = await self.get_msg_from_dht(local_user_key)
+        
+                if msg != None:
+                    self.parse_dht_msg(msg)
+                logging.debug("GETTING ALL MESSAGES FOR %s" % (str(local_user_key)))
+                msg = await self.get_msg_from_dht("all")
+        
+                if msg != None:
+                    self.parse_dht_msg(msg)
+                    
+        logging.debug("HEARTBEAT COMPONENT END")
+         
     def message(self, msg):
         """
         Process incoming message stanzas. Be aware that this also
@@ -107,7 +158,7 @@ class dhtxmpp_component(ComponentXMPP):
 
         to_user_key = custom_protocol.create_user_key(str(to_jid.user), None)
         from_user_key = custom_protocol.create_user_key(str(from_jid.user), str(self.dht.server.node.long_id))   
-        logging.debug("SENDING MSG TO KEY: %s=%s" % (str(to_user_key), str(msg_body)))
+        logging.debug("SENDING MESSAGE TO KEY: %s=%s" % (str(to_user_key), str(msg_body)))
         fullmsg = dhtxmpp_protocol_msg.create_msg_str(from_user_key, to_user_key, msg_body)
         self.send_msg_to_dht(to_user_key, fullmsg)        
         
@@ -128,14 +179,7 @@ class dhtxmpp_component(ComponentXMPP):
         self.send_roster()
         #self.dht.server.refreshAllTable()
         self.publish_jid_to_dht()
-        #get all the messages
-        local_user_key = custom_protocol.create_user_key(str(self.local_jid.user), None)
-        logging.debug("GETTING MESSAGES FOR %s" % (str(local_user_key)))
-        msg = self.get_msg_from_dht(local_user_key)
-        
-        if msg != None:
-            self.parse_dht_msg(msg)
-                    
+
     def presence_unavailable(self, presence):
         """
         Process incoming presence stanzas. 
@@ -180,7 +224,7 @@ class dhtxmpp_component(ComponentXMPP):
         
 
         if to_jid != None:
-            logging.debug("Sending presence to %s from %s" % (str(to_jid), str(from_jid)))
+            logging.debug("Sending presence subscription to %s from %s" % (str(to_jid), str(from_jid)))
             self.send_presence_subscription(pto=to_jid, pfrom=from_jid)
             #self.sendPresence(pshow='available', pto=to_jid, pfrom=mesh_jid)
             self.client_roster.add(str(from_jid))
@@ -203,7 +247,6 @@ class dhtxmpp_component(ComponentXMPP):
     
         if to_jid != None:
             logging.debug("Sending unavailable presence to %s from %s" % (str(to_jid), str(from_jid)))
-            #self.send_presence_subscription(pto=to_jid, pfrom=from_jid, ptype='unsubscribe')
             self.sendPresence(pshow='unavailable', pto=to_jid, pfrom=from_jid)
             #self.client_roster.remove(str(from_jid))
             presence = self.make_presence(pshow='unavailable', pfrom=from_jid)
@@ -232,23 +275,21 @@ class dhtxmpp_component(ComponentXMPP):
                     if pres['status']:
                         status = pres['status']
                     from_jid = create_jid(JID(jid).user)
+                    logging.debug("SENDING ROSTER PRESENCE TO %s FROM %s WITH STATUS %s" % (str(self.local_jid), str(from_jid), str(status)))
                     self.sendPresence(pshow=show, pto=self.local_jid, pfrom=from_jid, pstatus=status)
                                  
     def handle_probe(self, presence):
         sender = presence['from']
         # Populate the presence reply with the agent's current status.
         self.sendPresence(pto=sender, pstatus="online", pshow="online")
-        
-    def run(self):
-        self.dht.run();
-        
+                
     def publish_jid_to_dht(self):
         if self.local_jid != None:            
             # publish jid.user and node.id
             user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
             msg = dhtxmpp_protocol_msg.create_presence_str(user_key, "available")
             logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
-            self.send_msg_to_dht(user_key, msg) 
+            self.send_msg_to_dht("all", msg) 
         else:
             logging.debug("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")      
             
@@ -258,20 +299,23 @@ class dhtxmpp_component(ComponentXMPP):
             user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
             msg = dhtxmpp_protocol_msg.create_presence_str(user_key, "unavailable")
             logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
-            self.send_msg_to_dht(user_key, msg) 
+            self.send_msg_to_dht("all", msg) 
         else:
             logging.debug("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")    
             
  
     def send_msg_to_dht(self, to, msg):
-        logging.debug("SENDING MSG TO %s" % (str(to)))
-        key = hashlib.sha1(str(to).encode('utf-8')).digest()
-        self.dht.set(key, str(msg))
+        logging.debug("SETTING DHT MSG TO %s" % (str(to)))
+        key = to #hashlib.sha1(str(to).encode('utf-8')).digest() 
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(self.dht.set(key, str(msg)))
+        return result
  
-    def get_msg_from_dht(self, jid):
-        logging.debug("GETTING MSG FROM %s" % (str(jid)))
-        key = hashlib.sha1(str(jid).encode('utf-8')).digest()
-        msg = self.dht.get(key)
+    async def get_msg_from_dht(self, jid):
+        logging.debug("GETTING DHT MSG FOR %s" % (str(jid)))
+        key = jid #hashlib.sha1(str(jid).encode('utf-8')).digest()
+        msg = await self.dht.get(key)
         return msg
                           
     def parse_dht_msg(self, value_str):         

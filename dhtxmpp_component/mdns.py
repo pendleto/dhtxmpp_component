@@ -9,7 +9,7 @@ import socket
 import time
 import random
 
-from zeroconf import ServiceInfo, Zeroconf, ServiceBrowser, ServiceStateChange, DNSAddress
+from zeroconf import ServiceInfo, Zeroconf, ServiceBrowser, ServiceStateChange
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -55,19 +55,17 @@ class mdns_service(object):
         
     def on_service_state_change(self, zeroconf, service_type, name, state_change):
         if state_change is ServiceStateChange.Added:
-            zeroconf.get_service_info(service_type, name)
-            cache=zeroconf.cache.cache
-            # list all known hosts in .local
-            for key in cache.keys():
-                if len(cache[key]) and isinstance(cache[key][0],DNSAddress):
-                    #logging.debug(key,cache[key])
-                    self.service_address = cache[key][0]
+            info = zeroconf.get_service_info(service_type, name)
+            if info:
+                logging.debug("  Zeroconf service Address: %s:%d" % (socket.inet_ntoa(info.address), info.port))
+                self.service_address = socket.inet_ntoa(info.address)
 
     def listen_for_service(self):
+        self.service_address = None
         self.zeroconf = Zeroconf()
         ServiceBrowser(self.zeroconf, "_dht._tcp.local.", handlers=[self.on_service_state_change])
         num_listen_tries = 0
-        self.service_address = None
+
         while(num_listen_tries<10):
             logging.debug("Listening for mdns dhtxmpp service...%d" % (num_listen_tries))
             num_listen_tries += 1          

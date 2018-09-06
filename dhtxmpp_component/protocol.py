@@ -46,12 +46,12 @@ class dhtxmpp_protocol_msg:
         msg_list = msg.split(':')
         self.protocol_version = msg_list[0]
         self.time_epoch = msg_list[1] 
-        self.msg_type = msg_list[2]
-        self.from_user_key = msg_list[3]        
-        if self.msg_type == dhtxmpp_protocol_msg.msg_type_msg:               
+        self.msg_type = msg_list[2] 
+        self.from_user_key = msg_list[3] 
+        if self.msg_type == dhtxmpp_protocol_msg.msg_type_msg:            
             self.to_user_key = msg_list[4] 
             self.msg_body = ':'.join(msg_list[5:]) 
-        elif self.msg_type == dhtxmpp_protocol_msg.msg_type_prs: 
+        elif self.msg_type == dhtxmpp_protocol_msg.msg_type_prs:  
             self.presence = msg_list[4] 
               
     @staticmethod
