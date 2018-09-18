@@ -8,10 +8,7 @@
 
 import sys
 import logging
-import getpass
-import hashlib
 import asyncio
-from optparse import OptionParser
 
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp import JID, jid
@@ -20,7 +17,7 @@ from sleekxmpp.xmlstream.matcher import StanzaPath
 
 from collections import Counter
 
-from dhtxmpp_component.protocol import custom_protocol, dhtxmpp_protocol_msg
+from dhtxmpp_component.protocol import protocol, dhtxmpp_protocol_msg
 from dhtxmpp_component.dht import DHT
 from dhtxmpp_component.mdns import mdns_service
 
@@ -50,7 +47,7 @@ class dhtxmpp_component(ComponentXMPP):
     """
     A XMPP component routes messages through a DHT.
     """
-
+    HEARTBEAT_INTERVAL_SECS = 10
     def __init__(self, jid, secret, server, port, bootstrapip):
         ComponentXMPP.__init__(self, jid, secret, server, port)
 
@@ -62,7 +59,9 @@ class dhtxmpp_component(ComponentXMPP):
         # MUC messages and error messages.
         self.bootstrapip = bootstrapip
         self.local_jid = None
-        self.local_user_key = None   
+        self.local_user_key = None
+        self.last_msg_delivery_time_epoch = {}   
+        self.last_prs_delivery_time_epoch = {} 
         
     def run(self):        
         try:
@@ -108,7 +107,7 @@ class dhtxmpp_component(ComponentXMPP):
         logging.debug("HEARTBEAT COMPONENT")
         asyncio.ensure_future(self._heartbeat())
         loop = asyncio.get_event_loop()
-        self.refresh_loop = loop.call_later(60, self.heartbeat)
+        self.refresh_loop = loop.call_later(self.HEARTBEAT_INTERVAL_SECS, self.heartbeat)
 
     async def _heartbeat(self):
         logging.debug("HEARTBEAT COMPONENT START")
@@ -120,17 +119,24 @@ class dhtxmpp_component(ComponentXMPP):
             
             if self.local_jid != None:
                 #get all the messages
-                local_user_key = custom_protocol.create_user_key(str(self.local_jid.user), None)
-                logging.debug("GETTING MESSAGES FOR %s" % (str(local_user_key)))
-                msg = await self.get_msg_from_dht(local_user_key)
+                msg_key = protocol.create_msg_key(str(self.local_jid.user), dhtxmpp_protocol_msg.msg_type_msg)
+                logging.debug("GETTING MESSAGES FOR %s" % (str(msg_key)))
+                msg = await self.get_msg_from_dht(msg_key)
         
                 if msg != None:
                     self.parse_dht_msg(msg)
-                logging.debug("GETTING ALL MESSAGES FOR %s" % (str(local_user_key)))
-                msg = await self.get_msg_from_dht("all")
+                else:
+                    logging.debug("NO MESSAGES FOUND FOR %s" % (str(msg_key)))
+                    
+                    
+                msg_key = protocol.create_msg_key("all", dhtxmpp_protocol_msg.msg_type_prs)
+                logging.debug("GETTING ALL PRESENCES FOR %s" % (str(msg_key)))
+                msg = await self.get_msg_from_dht(msg_key)
         
                 if msg != None:
                     self.parse_dht_msg(msg)
+                else:
+                    logging.debug("NO PRESENCES FOUND FOR %s" % (str(msg_key)))
                     
         logging.debug("HEARTBEAT COMPONENT END")
          
@@ -156,11 +162,12 @@ class dhtxmpp_component(ComponentXMPP):
         # strip off the server
         msg_body = msg['body']
 
-        to_user_key = custom_protocol.create_user_key(str(to_jid.user), None)
-        from_user_key = custom_protocol.create_user_key(str(from_jid.user), str(self.dht.server.node.long_id))   
+        to_user_key = protocol.create_user_key(str(to_jid.user))
+        from_user_key = protocol.create_user_key(str(from_jid.user))   
         logging.debug("SENDING MESSAGE TO KEY: %s=%s" % (str(to_user_key), str(msg_body)))
         fullmsg = dhtxmpp_protocol_msg.create_msg_str(from_user_key, to_user_key, msg_body)
-        self.send_msg_to_dht(to_user_key, fullmsg)        
+        msg_key = protocol.create_msg_key(str(to_jid.user), dhtxmpp_protocol_msg.msg_type_msg)
+        self.send_msg_to_dht(msg_key, fullmsg)        
         
     def presence_available(self, presence):
         """
@@ -172,11 +179,16 @@ class dhtxmpp_component(ComponentXMPP):
         # outgoing reply's 'from' JID.
         from_jid = JID(presence['from'])
         self.local_jid = from_jid
-        self.local_user_key = custom_protocol.create_user_key(str(from_jid.user), str(self.dht.server.node.long_id))   
+        self.local_user_key = protocol.create_user_key(str(from_jid.user))   
         logging.debug("got presence from: %s" % (str(from_jid)))
         self.sendPresence(pshow='available', pto=from_jid)
         # go through all items in the component roster send the presence ones to the local client
         self.send_roster()
+        
+        #loop = asyncio.new_event_loop()
+        #asyncio.set_event_loop(loop)
+        #loop.run_until_complete(self.get_roster_presence())
+        
         #self.dht.server.refreshAllTable()
         self.publish_jid_to_dht()
 
@@ -221,7 +233,6 @@ class dhtxmpp_component(ComponentXMPP):
             presence = self.make_presence(pshow='available', pfrom=from_jid)
             self.client_roster[from_jid].handle_available(presence)
             return
-        
 
         if to_jid != None:
             logging.debug("Sending presence subscription to %s from %s" % (str(to_jid), str(from_jid)))
@@ -229,7 +240,7 @@ class dhtxmpp_component(ComponentXMPP):
             #self.sendPresence(pshow='available', pto=to_jid, pfrom=mesh_jid)
             self.client_roster.add(str(from_jid))
         else:
-            print ("Could not send presence because local_jid was not set") 
+            logging.debug ("Could not send presence because local_jid was not set") 
                                   
     def on_unavailable_jid_from_dht(self, from_jid):
         # a jid has left the network
@@ -252,8 +263,27 @@ class dhtxmpp_component(ComponentXMPP):
             presence = self.make_presence(pshow='unavailable', pfrom=from_jid)
             self.client_roster[from_jid].handle_unavailable(presence)
         else:
-            print ("Could not send unavailable presence because local_jid was not set")   
+            logging.debug ("Could not send unavailable presence because local_jid was not set")   
   
+    async def get_roster_presence(self):
+        groups = self.client_roster.groups()
+        for group in groups:
+            for jid in groups[group]:
+                sub = self.client_roster[jid]['subscription']
+                name = self.client_roster[jid]['name']
+                if self.client_roster[jid]['name']:
+                    logging.debug(' ROSTER %s (%s) [%s]' % (name, jid, sub))
+                else:
+                    logging.debug(' ROSTER %s [%s]' % (jid, sub))
+
+                #get all the messages
+                msg_key = protocol.create_msg_key(JID(jid).user, dhtxmpp_protocol_msg.msg_type_prs)
+                logging.debug("GETTING PRESENCE FOR %s" % (str(msg_key)))
+                msg = await self.get_msg_from_dht(msg_key)
+                
+                if msg != None:
+                    self.parse_dht_msg(msg)
+        
     def send_roster(self):
         groups = self.client_roster.groups()
         for group in groups:
@@ -286,20 +316,22 @@ class dhtxmpp_component(ComponentXMPP):
     def publish_jid_to_dht(self):
         if self.local_jid != None:            
             # publish jid.user and node.id
-            user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
+            msg_key = protocol.create_msg_key("all", dhtxmpp_protocol_msg.msg_type_prs)
+            user_key = protocol.create_user_key(str(self.local_jid.user))
             msg = dhtxmpp_protocol_msg.create_presence_str(user_key, "available")
             logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
-            self.send_msg_to_dht("all", msg) 
+            self.send_msg_to_dht(msg_key, msg) 
         else:
             logging.debug("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")      
             
     def unpublish_jid_to_dht(self):
         if self.local_jid != None:            
             # publish jid.user and node.id
-            user_key = custom_protocol.create_user_key(self.local_jid.user, str(self.dht.server.node.long_id))
+            msg_key = protocol.create_msg_key("all", dhtxmpp_protocol_msg.msg_type_prs)
+            user_key = protocol.create_user_key(str(self.local_jid.user))
             msg = dhtxmpp_protocol_msg.create_presence_str(user_key, "unavailable")
             logging.debug("SET DHT KEY: %s=%s" % (str(user_key), str(msg)))
-            self.send_msg_to_dht("all", msg) 
+            self.send_msg_to_dht(msg_key, msg) 
         else:
             logging.debug("LOCAL JID NOT KNOWN YET. NOT PUBLISHING PRESENCE")    
             
@@ -319,33 +351,39 @@ class dhtxmpp_component(ComponentXMPP):
         return msg
                           
     def parse_dht_msg(self, value_str):         
-        logging.debug("PARSING DHT XMPP MESSAGE") 
-        pmsg = custom_protocol.crack_msg(value_str)
-        msg_type = pmsg.msg_type
-        logging.debug("PARSING DHT XMPP MESSAGE TYPE %s" % (msg_type)) 
-        if msg_type != None:
+        logging.debug("PARSING DHT XMPP MESSAGE %s" % (value_str)) 
+        pmsglist = protocol.crack_msg(value_str)
+        
+        for pmsg in pmsglist:
+            msg_type = pmsg.msg_type
+            logging.debug("PARSING DHT XMPP MESSAGE TYPE %s" % (msg_type)) 
+            if msg_type != None:
   
-            if msg_type == dhtxmpp_protocol_msg.msg_type_msg:
-                
-                logging.debug("XMPP MESSAGE TYPE TO %s LOCAL %s" % (pmsg.to_user_key, self.local_user_key)) 
-                
-                # if this msg is destined for this node
-                if (pmsg.to_user_key == self.local_user_key):
-                    from_jid = create_jid(pmsg.from_user_key)
-                    logging.debug("Sending message %s" % pmsg.msg_body)
-                    self.send_message(mto=self.local_jid,
+                if msg_type == dhtxmpp_protocol_msg.msg_type_msg:              
+                    logging.debug("XMPP MESSAGE TYPE TO %s LOCAL %s" % (pmsg.to_user_key, self.local_user_key))               
+                    # if this msg is destined for this node
+                    if (pmsg.to_user_key == self.local_user_key):
+                        from_jid = create_jid(pmsg.from_user_key)
+                        # if last delivery time from this jid < current msg time
+                        if pmsg.time_epoch > self.last_msg_delivery_time_epoch.get(from_jid, 0):
+                            self.last_msg_delivery_time_epoch[from_jid] = pmsg.time_epoch
+                            
+                            logging.debug("Sending message %s" % pmsg.msg_body)
+                            self.send_message(mto=self.local_jid,
                                        mfrom=from_jid,
                                        mbody=pmsg.msg_body,
                                        mtype='chat')
-                    
-                
-            elif msg_type == dhtxmpp_protocol_msg.msg_type_prs:    
-                # if this msg is not from this node                
-                if (pmsg.from_user_key != self.local_user_key):
-                    print ("adding new jid %s" % (str(pmsg.from_user_key)))
-                    jid = create_jid(pmsg.from_user_key)
-                    
-                    if (pmsg.presence=="available"):
-                        self.on_available_jid_from_dht(jid)  
-                    else:
-                        self.on_unavailable_jid_from_dht(jid)     
+                                  
+                elif msg_type == dhtxmpp_protocol_msg.msg_type_prs:    
+                    # if this msg is not from this node                
+                    if (pmsg.from_user_key != self.local_user_key):
+                        from_jid = create_jid(pmsg.from_user_key)
+                        # if last delivery time from this jid < current msg time
+                        if pmsg.time_epoch > self.last_prs_delivery_time_epoch.get(from_jid, 0):
+                            self.last_prs_delivery_time_epoch[from_jid] = pmsg.time_epoch
+                            logging.debug ("adding new jid %s" % (str(pmsg.from_user_key)))
+                                   
+                            if (pmsg.presence=="available"):
+                                self.on_available_jid_from_dht(from_jid)  
+                            else:
+                                self.on_unavailable_jid_from_dht(from_jid)     

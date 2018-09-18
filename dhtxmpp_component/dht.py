@@ -6,13 +6,9 @@
     See the file LICENSE for copying permission.
 """
 
-import sys
 import asyncio
-import random
-import threading
-from kademlia.network import Server
+from dhtxmpp_component.server import server
 from collections import Counter
-from dhtxmpp_component.protocol import custom_protocol
 
 import logging
 
@@ -23,18 +19,15 @@ log.addHandler(logging.StreamHandler())
 def most_common(lst):
     data = Counter(lst)
     return data.most_common(1)[0][0]
-
-class dhtxmpp_server(Server):
-    protocol_class = custom_protocol
-    def __init__(self):
-        Server.__init__(self)
     
 class DHT():
-
+    
+    HEARTBEAT_INTERVAL_SECS = 10
+    
     def __init__(self, bootstrapip, xmpp):
         # log to std out
         self.bootstrapip = bootstrapip
-        self.server = dhtxmpp_server()
+        self.server = server()
         self.server.listen(5678)
         self.server.protocol.dht = self        
         self.myip = None
@@ -64,7 +57,7 @@ class DHT():
         logging.debug("HEARTBEAT DHT")
         asyncio.ensure_future(self._heartbeat())
         loop = asyncio.get_event_loop()
-        self.refresh_loop = loop.call_later(60, self.heartbeat)
+        self.refresh_loop = loop.call_later(self.HEARTBEAT_INTERVAL_SECS, self.heartbeat)
 
     async def _heartbeat(self):
         logging.debug("HEARTBEAT DHT START")
@@ -97,23 +90,23 @@ class DHT():
 
     async def set(self, key, value):
         # Give it some async work
-        log.debug("SETTING KEY %s ON NETWORK" % (str(key)))
+        logging.debug("SETTING KEY %s ON NETWORK" % (str(key)))
         await self.server.set(key, str(value))
     
     async def get(self, key):
-        log.debug("GETTING KEY %s OFF NETWORK" % (str(key)))
+        logging.debug("GETTING KEY %s OFF NETWORK" % (str(key)))
         result = await self.server.get(key)
-        log.debug("GOT VALUE %s OFF NETWORK" % (str(result)))
+        logging.debug("GOT VALUE %s OFF NETWORK" % (str(result)))
         return result
                         
     def get_visible_ip_callback(self, ip_list, server):
         # check that it got a result back
         # print str(server.node.long_id)
         if not len(ip_list):
-            print ("Could not determine my ip")
+            logging.debug ("Could not determine my ip")
         if len(ip_list) > 0:
             self.myip = most_common(ip_list)
-            print ("found my ip = %s" % str(self.myip))
+            logging.debug ("found my ip = %s" % str(self.myip))
 
 
     def get_visible_ip(self):
@@ -121,3 +114,4 @@ class DHT():
 
     def findneighbors(self):
         return self.server.bootstrappableNeighbors()
+    
