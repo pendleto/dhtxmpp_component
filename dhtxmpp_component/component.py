@@ -76,9 +76,10 @@ class dhtxmpp_component(ComponentXMPP):
                         bootstrapip = "127.0.0.1"
                     else:
                         bootstrapip = str(dht_address)
-                    if bootstrapip == "127.0.0.1":
-                        registered_dht_with_mdns = True
-                        self.mdns.register_dht_with_mdns()
+                        
+                        
+                registered_dht_with_mdns = True
+                self.mdns.register_dht_with_mdns()
                                    
                 self.dht = DHT(bootstrapip, self)
                 self.add_event_handler('presence_probe', self.handle_probe)
@@ -113,6 +114,14 @@ class dhtxmpp_component(ComponentXMPP):
         logging.debug("HEARTBEAT COMPONENT START")
 
         if self.dht.num_failures == 10:
+            logging.debug("NO NEIGHBORS FOUND. RESETTING")
+            # Run the mdns to discover dht
+            dht_address = self.mdns.listen_for_service()
+            logging.debug("RESETTING DHT. LISTENED FOR DHT GOT ADDRESS %s" % (str(dht_address)))        
+            if dht_address == None:                
+                self.dht.bootstrapip = "127.0.0.1"
+            else:
+                self.dht.bootstrapip = str(dht_address)
             await self.dht.bootstrap()
             
         elif self.dht.num_failures == 0:
