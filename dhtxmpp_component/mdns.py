@@ -69,7 +69,7 @@ class mdns_service(object):
         while(num_listen_tries<10):
             logging.debug("Listening for mdns dhtxmpp service...%d" % (num_listen_tries))
             num_listen_tries += 1          
-            time.sleep(random.randint(30,60))
+            time.sleep(random.randint(3,6))
             
             if self.service_address != None:
                 logging.debug("Found mdns dhtxmpp service on %s" %(str(self.service_address)))

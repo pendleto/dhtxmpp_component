@@ -20,7 +20,7 @@ class storage(IStorage):
 
     def __setitem__(self, key, value):
         if key in self.data:
-            self.data[key][1].add(value)
+            self.data[key][1].add(str(value))
         else:
             self.data[key] = (time.time(), storage_value(value))
         self.cull()
@@ -36,12 +36,12 @@ class storage(IStorage):
     def get(self, key, default=None):
         self.cull()
         if key in self.data:
-            return self.data[key][1].get_value_str()
+            return str(self.data[key][1])
         return default
 
     def __getitem__(self, key):
         self.cull()
-        return self.data[key][1].get_value_str()
+        return str(self.data[key][1])
 
     def __iter__(self):
         self.cull()
@@ -77,7 +77,7 @@ class storage_value:
     
     def add(self, value, ttl=604800):
         self.cull()
-        self.data.append ((time.time(), ttl, value))
+        self.data.append ((time.time(), ttl, str(value)))
         
     def cull(self):
         newdata = []
@@ -90,9 +90,9 @@ class storage_value:
     
         self.data = newdata
         
-    def get_value_str(self):
+    def __str__(self):
         values = []
         for data in self.data:
-            values.append(data[2])
+            values.append(str(data[2]))
             
         return "|".join(values)
