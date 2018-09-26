@@ -190,9 +190,9 @@ class dhtxmpp_component(ComponentXMPP):
         self.local_jid = from_jid
         self.local_user_key = protocol.create_user_key(str(from_jid.user))   
         logging.debug("got presence from: %s" % (str(from_jid)))
-        self.sendPresence(pshow='available', pto=from_jid)
+        #self.sendPresence(pshow='available', pto=from_jid)
         # go through all items in the component roster send the presence ones to the local client
-        self.send_roster()
+        #self.send_roster()
         
         #loop = asyncio.new_event_loop()
         #asyncio.set_event_loop(loop)
@@ -229,27 +229,32 @@ class dhtxmpp_component(ComponentXMPP):
             logging.debug("Couldn't find JID")
             return
         logging.debug("New JID %s found on DHT" % (str(from_jid)))
-        to_jid = self.local_jid
         
+        if self.local_jid != None:
+            to_jid = self.local_jid
+            self.sendPresence(pshow='available', pto=to_jid, pfrom=from_jid)
+        else:
+            logging.debug ("Could not send available presence because local_jid was not set") 
+            
         # Go through the jids on our roster and send their presences to 
         # the local jid
         
         # check if this jid is already on our roster
-        existing = self.client_roster.has_jid(from_jid)
-        if existing == True:
-            logging.debug("%s already exists in our roster" % (str(from_jid)))
-            self.sendPresence(pshow='available', pto=to_jid, pfrom=from_jid)
-            presence = self.make_presence(pshow='available', pfrom=from_jid)
-            self.client_roster[from_jid].handle_available(presence)
-            return
+        #existing = self.client_roster.has_jid(from_jid)
+        #if existing == True:
+        #    logging.debug("%s already exists in our roster" % (str(from_jid)))
+        #    self.sendPresence(pshow='available', pto=to_jid, pfrom=from_jid)
+        #    presence = self.make_presence(pshow='available', pfrom=from_jid)
+        #    self.client_roster[from_jid].handle_available(presence)
+        #    return
 
-        if to_jid != None:
-            logging.debug("Sending presence subscription to %s from %s" % (str(to_jid), str(from_jid)))
-            self.send_presence_subscription(pto=to_jid, pfrom=from_jid)
-            #self.sendPresence(pshow='available', pto=to_jid, pfrom=mesh_jid)
-            self.client_roster.add(str(from_jid))
-        else:
-            logging.debug ("Could not send presence because local_jid was not set") 
+        #if to_jid != None:
+        #    logging.debug("Sending presence subscription to %s from %s" % (str(to_jid), str(from_jid)))
+        #    self.send_presence_subscription(pto=to_jid, pfrom=from_jid)
+        #self.sendPresence(pshow='available', pto=to_jid, pfrom=mesh_jid)
+        #   self.client_roster.add(str(from_jid))
+        #else:
+        #    logging.debug ("Could not send presence because local_jid was not set") 
                                   
     def on_unavailable_jid_from_dht(self, from_jid):
         # a jid has left the network
@@ -258,21 +263,27 @@ class dhtxmpp_component(ComponentXMPP):
             logging.debug("Couldn't find JID")
             return
         logging.debug("JID %s left the DHT" % (str(from_jid)))
-        to_jid = self.local_jid
-        # check if this jid is already on our roster
-        existing = self.client_roster.has_jid(from_jid)
-        if existing == False:
-            logging.debug("%s doesn't exist in our roster" % (str(from_jid)))
-            return
-    
-        if to_jid != None:
-            logging.debug("Sending unavailable presence to %s from %s" % (str(to_jid), str(from_jid)))
+        
+        if self.local_jid != None:
+            to_jid = self.local_jid
             self.sendPresence(pshow='unavailable', pto=to_jid, pfrom=from_jid)
-            #self.client_roster.remove(str(from_jid))
-            presence = self.make_presence(pshow='unavailable', pfrom=from_jid)
-            self.client_roster[from_jid].handle_unavailable(presence)
         else:
-            logging.debug ("Could not send unavailable presence because local_jid was not set")   
+            logging.debug ("Could not send unavailable presence because local_jid was not set") 
+            
+        # check if this jid is already on our roster
+        #existing = self.client_roster.has_jid(from_jid)
+        #if existing == False:
+        #    logging.debug("%s doesn't exist in our roster" % (str(from_jid)))
+        #    return
+    
+        #if to_jid != None:
+        #    logging.debug("Sending unavailable presence to %s from %s" % (str(to_jid), str(from_jid)))
+        #    self.sendPresence(pshow='unavailable', pto=to_jid, pfrom=from_jid)
+        #self.client_roster.remove(str(from_jid))
+        #  presence = self.make_presence(pshow='unavailable', pfrom=from_jid)
+        #   self.client_roster[from_jid].handle_unavailable(presence)
+        #else:
+        #   logging.debug ("Could not send unavailable presence because local_jid was not set")   
   
     async def get_roster_presence(self):
         groups = self.client_roster.groups()
