@@ -9,6 +9,8 @@
 import sys
 import logging
 import asyncio
+import threading
+import time
 
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp import JID, jid
@@ -88,11 +90,12 @@ class dhtxmpp_component(ComponentXMPP):
                 self.add_event_handler("presence_unavailable", self.presence_unavailable)
                 self.add_event_handler('disco_info', self.disco_info)        
                 self.register_handler(Callback('Disco Info', StanzaPath('iq/disco_info'), self.disco_info))
-                                
-                self.heartbeat()
+                self.heartbeat_loop = asyncio.new_event_loop()
+                self.heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.heartbeat_loop,)).start()     
+                #self.heartbeat()
                 self.dht.run()
 
-                self.refresh_loop.cancel()
+                self.heartbeat_thread.stop()
                 
                 if registered_dht_with_mdns == True:
                     self.mdns.unregister_dht_with_mdns()
@@ -104,12 +107,13 @@ class dhtxmpp_component(ComponentXMPP):
             self.dht.quit() 
     
    
-    def heartbeat(self):
-        logging.debug("HEARTBEAT COMPONENT")
-        asyncio.ensure_future(self._heartbeat())
-        loop = asyncio.get_event_loop()
-        self.refresh_loop = loop.call_later(self.HEARTBEAT_INTERVAL_SECS, self.heartbeat)
-
+    def heartbeat(self, loop):
+        while True:
+            # Blocking call which returns when the display_date() coroutine is done
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self._heartbeat())
+            time.sleep(self.HEARTBEAT_INTERVAL_SECS)
+            
     async def _heartbeat(self):
         logging.debug("HEARTBEAT COMPONENT START")
 

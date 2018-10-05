@@ -65,20 +65,26 @@ class dhtxmpp_protocol_msg:
             self.msg_body = ':'.join(msg_list[5:]) 
         elif self.msg_type == dhtxmpp_protocol_msg.msg_type_prs:  
             self.presence = msg_list[4] 
+            
+    def __str__(self):
+        if self.msg_type == dhtxmpp_protocol_msg.msg_type_msg:            
+            return self.create_msg_str(self.from_user_key, self.to_user_key, self.msg_body, self.time_epoch, self.protocol_version)
+        elif self.msg_type == dhtxmpp_protocol_msg.msg_type_prs:  
+            return self.create_presence_str(self.from_user_key, self.presence, self.time_epoch, self.protocol_version)         
               
     @staticmethod
-    def create_presence_str(user_key, status):
-        presence = dhtxmpp_protocol_msg.MSG_FIELD_SEP.join([dhtxmpp_protocol_msg.create_prologue_str(dhtxmpp_protocol_msg.msg_type_prs), user_key, status])
-        return presence
+    def create_presence_str(user_key, presence, t = time.time(), protocol_version = protocol.PROTOCOL_VERSION):
+        pmsg_str = dhtxmpp_protocol_msg.MSG_FIELD_SEP.join([dhtxmpp_protocol_msg.create_prologue_str(dhtxmpp_protocol_msg.msg_type_prs, t, protocol_version), user_key, presence])
+        return pmsg_str
                 
     @staticmethod
-    def create_msg_str(from_user_key, to_user_key, msg_body):
-        fullmsg = dhtxmpp_protocol_msg.MSG_FIELD_SEP.join([dhtxmpp_protocol_msg.create_prologue_str(dhtxmpp_protocol_msg.msg_type_msg), from_user_key, to_user_key, msg_body])
-        return fullmsg
+    def create_msg_str(from_user_key, to_user_key, msg_body, t = time.time(), protocol_version = protocol.PROTOCOL_VERSION):
+        msg_str = dhtxmpp_protocol_msg.MSG_FIELD_SEP.join([dhtxmpp_protocol_msg.create_prologue_str(dhtxmpp_protocol_msg.msg_type_msg, t, protocol_version), from_user_key, to_user_key, msg_body])
+        return msg_str
     
     @staticmethod            
-    def create_prologue_str(msg_type):
-        prologue = dhtxmpp_protocol_msg.MSG_FIELD_SEP.join([str(protocol.PROTOCOL_VERSION),str(time.time()), msg_type])
+    def create_prologue_str(msg_type, t, protocol_version):
+        prologue = dhtxmpp_protocol_msg.MSG_FIELD_SEP.join([str(protocol_version),str(t), msg_type])
         return prologue 
     
         

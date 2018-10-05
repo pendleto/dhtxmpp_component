@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 
 import sys
-import time
 import logging
 from optparse import OptionParser
-
-from sleekxmpp.componentxmpp import ComponentXMPP
-from sleekxmpp import JID, jid
-from sleekxmpp.xmlstream.handler import Callback
-from sleekxmpp.xmlstream.matcher import StanzaPath
 
 from dhtxmpp_component.component import dhtxmpp_component
 
@@ -67,9 +61,9 @@ def main():
     opts, args = optp.parse_args()
 
     # Setup logging.
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=opts.loglevel,
                     format='%(pathname)s %(asctime)s %(levelname)s %(message)s',
-                    filename='/var/log/dhtxmpp_componentd.log',
+                    filename='/var/log/dhtxmpp_componentd/dhtxmpp_componentd.log',
                     filemode='w',
                     )
 

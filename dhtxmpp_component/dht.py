@@ -11,9 +11,11 @@ from dhtxmpp_component.server import server
 from collections import Counter
 
 import logging
+import time
+import threading
 
 log = logging.getLogger('dhtxmpp_component')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 log.addHandler(logging.StreamHandler())
 
 def most_common(lst):
@@ -39,13 +41,15 @@ class DHT():
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
         self.loop.run_until_complete(self.bootstrap())
-        self.heartbeat()
+        self.heartbeat_loop = asyncio.new_event_loop()
+        self.heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.heartbeat_loop,)).start()
         
         try:
             self.loop.run_forever()
         except KeyboardInterrupt:
             pass
         finally:
+            self.heartbeat_thread.stop()
             logging.debug("CLOSING DHT")
             self.quit()
         
@@ -53,12 +57,13 @@ class DHT():
         self.num_failures = None
         await self.server.bootstrap([(self.bootstrapip, 5678)])
         
-    def heartbeat(self):
-        logging.debug("HEARTBEAT DHT")
-        asyncio.ensure_future(self._heartbeat())
-        loop = asyncio.get_event_loop()
-        self.refresh_loop = loop.call_later(self.HEARTBEAT_INTERVAL_SECS, self.heartbeat)
-
+    def heartbeat(self, loop):
+        while True:
+            # Blocking call which returns when the display_date() coroutine is done
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self._heartbeat())
+            time.sleep(self.HEARTBEAT_INTERVAL_SECS)
+            
     async def _heartbeat(self):
         logging.debug("HEARTBEAT DHT START")
         data = {
@@ -90,8 +95,9 @@ class DHT():
 
     async def set(self, key, value):
         # Give it some async work
-        logging.debug("SETTING KEY %s ON NETWORK" % (str(key)))
-        await self.server.set(key, str(value))
+        result = await self.server.set(key, str(value))
+        logging.debug("SETTING KEY %s ON NETWORK SUCCESS=%s" % (str(key), str(result)))
+        return result
     
     async def get(self, key):
         logging.debug("GETTING KEY %s OFF NETWORK" % (str(key)))

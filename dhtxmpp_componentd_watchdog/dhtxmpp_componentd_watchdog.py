@@ -87,9 +87,9 @@ def main():
 
     # Setup logging.
     # Setup logging.
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=opts.loglevel,
                     format='%(pathname)s %(asctime)s %(levelname)s %(message)s',
-                    filename='/var/log/dhtxmpp_componentd_watchdog.log',
+                    filename='/var/log/dhtxmpp_componentd_watchdog/dhtxmpp_componentd_watchdog.log',
                     filemode='w',
                     )
     while True: 

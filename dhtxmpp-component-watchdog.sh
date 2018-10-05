@@ -16,7 +16,7 @@ DAEMON_NAME=dhtxmpp-component-watchdog
 DAEMON_USER=root
 
 # Add any command line options for your daemon here
-DAEMON_OPTS="-j watchdog@localhost -p dhtxmppcomponentsecret -t mesh.localhost"
+DAEMON_OPTS="-j watchdog@localhost -p dhtxmppcomponentsecret -t mesh.localhost -q"
 
 # The process ID of the script when it runs is stored here:
 PIDFILE=/var/run/$DAEMON_NAME.pid

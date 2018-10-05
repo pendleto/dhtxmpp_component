@@ -27,7 +27,7 @@ class mdns_service(object):
     
     def register_dht_with_mdns(self):
         
-        logging.basicConfig(level=logging.DEBUG,
+        logging.basicConfig(level=logging.INFO,
                         format='%(pathname)s %(asctime)s %(levelname)s %(message)s',
                         filename='/var/log/dhtxmpp_componentd_mdns.log',
                         filemode='w')
