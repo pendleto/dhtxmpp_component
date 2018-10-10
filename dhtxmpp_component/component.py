@@ -50,6 +50,7 @@ class dhtxmpp_component(ComponentXMPP):
     A XMPP component routes messages through a DHT.
     """
     HEARTBEAT_INTERVAL_SECS = 10
+    SCHEDULER_TIMEOUT_SECS = 60
     def __init__(self, jid, secret, server, port, bootstrapip):
         ComponentXMPP.__init__(self, jid, secret, server, port)
 
@@ -63,7 +64,7 @@ class dhtxmpp_component(ComponentXMPP):
         self.local_jid = None
         self.local_user_key = None
         self.last_msg_delivery_time_epoch = {}   
-        self.last_prs_delivery_time_epoch = {} 
+        self.last_prs_delivery_time_epoch = {}
         
     def run(self):        
         try:
@@ -84,18 +85,17 @@ class dhtxmpp_component(ComponentXMPP):
                 self.mdns.register_dht_with_mdns()
                                    
                 self.dht = DHT(bootstrapip, self)
-                self.add_event_handler('presence_probe', self.handle_probe)
-                self.add_event_handler("message", self.message)
-                self.add_event_handler("presence_available", self.presence_available)
-                self.add_event_handler("presence_unavailable", self.presence_unavailable)
-                self.add_event_handler('disco_info', self.disco_info)        
+                self.add_event_handler('presence_probe', self.handle_probe, True)
+                self.add_event_handler("message", self.message, True)
+                self.add_event_handler("presence_available", self.presence_available, True)
+                self.add_event_handler("presence_unavailable", self.presence_unavailable, True)
+                self.add_event_handler('disco_info', self.disco_info, True)        
                 self.register_handler(Callback('Disco Info', StanzaPath('iq/disco_info'), self.disco_info))
                 self.heartbeat_loop = asyncio.new_event_loop()
-                self.heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.heartbeat_loop,)).start()     
+                self.heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.heartbeat_loop,))
+                self.heartbeat_thread.start()     
                 #self.heartbeat()
                 self.dht.run()
-
-                self.heartbeat_thread.stop()
                 
                 if registered_dht_with_mdns == True:
                     self.mdns.unregister_dht_with_mdns()
@@ -150,7 +150,10 @@ class dhtxmpp_component(ComponentXMPP):
                     self.parse_dht_msg(msg)
                 else:
                     logging.debug("NO PRESENCES FOUND FOR %s" % (str(msg_key)))
-                    
+                 
+        logging.debug("SCHEDULERQUEUE QSIZE=%d" % self.scheduler.addq.qsize())
+        logging.debug("EVENTQUEUE QSIZE=%d" % self.event_queue.qsize())
+        logging.debug("SENDQUEUE QSIZE=%d" % self.send_queue.qsize())
         logging.debug("HEARTBEAT COMPONENT END")
          
     def message(self, msg):
@@ -194,15 +197,6 @@ class dhtxmpp_component(ComponentXMPP):
         self.local_jid = from_jid
         self.local_user_key = protocol.create_user_key(str(from_jid.user))   
         logging.debug("got presence from: %s" % (str(from_jid)))
-        #self.sendPresence(pshow='available', pto=from_jid)
-        # go through all items in the component roster send the presence ones to the local client
-        #self.send_roster()
-        
-        #loop = asyncio.new_event_loop()
-        #asyncio.set_event_loop(loop)
-        #loop.run_until_complete(self.get_roster_presence())
-        
-        #self.dht.server.refreshAllTable()
         self.publish_jid_to_dht()
 
     def presence_unavailable(self, presence):

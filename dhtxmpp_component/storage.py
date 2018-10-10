@@ -54,11 +54,11 @@ class storage(ForgetfulStorage):
         logging.debug("ADDING %s to storage" % (value))
         
         if key in self.data:
-            values = value.split("|")
+            values = value.split(protocol.MSG_SEP)
             newvalues = []
             for v in values:
                 found = False
-                for v2 in self.data[key][1].split("|"):
+                for v2 in self.data[key][1].split(protocol.MSG_SEP):
                     if v == v2:
                         logging.debug("VALUE %s already found in storage...skipping" % (v))
                         found = True
@@ -69,7 +69,7 @@ class storage(ForgetfulStorage):
             
             if len(newvalues) > 0: 
                 newvalues.append(self.data[key][1])
-                newvalue = "|".join(newvalues)
+                newvalue = protocol.MSG_SEP.join(newvalues)
             else:
                 return
             

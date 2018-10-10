@@ -42,14 +42,14 @@ class DHT():
         self.loop.set_debug(True)
         self.loop.run_until_complete(self.bootstrap())
         self.heartbeat_loop = asyncio.new_event_loop()
-        self.heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.heartbeat_loop,)).start()
+        self.heartbeat_thread = threading.Thread(target=self.heartbeat, args=(self.heartbeat_loop,))
+        self.heartbeat_thread.start()
         
         try:
             self.loop.run_forever()
         except KeyboardInterrupt:
             pass
         finally:
-            self.heartbeat_thread.stop()
             logging.debug("CLOSING DHT")
             self.quit()
         
@@ -85,7 +85,6 @@ class DHT():
         
     def quit(self):
         logging.debug("QUITTING DHT")
-        self.refresh_loop.cancel()
         self.server.stop()
         self.loop.stop()
         logging.debug("QUIT DHT")
