@@ -16,8 +16,10 @@ class dhtxmpp_componentd:
         xmpp.registerPlugin('xep_0004') # Data Forms
         xmpp.registerPlugin('xep_0060') # PubSub
         xmpp.registerPlugin('xep_0199') # XMPP Ping
+        xmpp.registerPlugin('xep_0184') # receipts
         xmpp.auto_authorize = True
         xmpp.auto_subscribe = True
+        xmpp.register_event_handlers()
 
         # Connect to the XMPP server and start processing XMPP stanzas.
         logging.debug("Connecting to XMPP server...")
