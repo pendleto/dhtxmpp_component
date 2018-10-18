@@ -72,10 +72,8 @@ class dhtxmpp_component(ComponentXMPP):
         self.add_event_handler("message", self.message, True)
         self.add_event_handler("presence_available", self.presence_available, True)
         self.add_event_handler("presence_unavailable", self.presence_unavailable, True)
-        self.add_event_handler('disco_info', self.disco_info, True)   
         self.add_event_handler('receipt_received', self.receipt_received, True)  
-        self.add_event_handler("session_start", self.session_start)       
-        self.register_handler(Callback('Disco Info', StanzaPath('iq/disco_info'), self.disco_info))
+        self.add_event_handler("session_start", self.session_start)
         
         
     def run(self):        
@@ -257,13 +255,7 @@ class dhtxmpp_component(ComponentXMPP):
         logging.debug("got unpresence from: %s" % (str(from_jid)))
         self.unpublish_jid_to_dht() 
         self.local_jid = None
-        self.local_user_key = None
-               
-    def disco_info(self, iq):
-        from_jid = JID(iq['from'])
-        logging.debug("got disco_info from: %s" % (str(from_jid)))
-        #component_jid = JID("mesh.localhost")
-        #self.send_presence_subscription(pto=from_jid, pfrom=component_jid)     
+        self.local_user_key = None   
         
                 
     def on_available_jid_from_dht(self, from_jid):

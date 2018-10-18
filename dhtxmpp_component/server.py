@@ -37,6 +37,9 @@ class server(Server):
         # do our crawling
         await asyncio.gather(*ds)
 
+        # cull old messages
+        
+        self.storage.cull_msgs()
         # now republish keys older than one hour
         for dkey, value in self.storage.iteritemsOlderThan(3600):
             await self.set_digest(dkey, str(value))

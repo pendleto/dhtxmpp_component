@@ -32,6 +32,7 @@ class storage(ForgetfulStorage):
                 
                 if (time.time() - int(t)) > self.msg_ttl:
                     expired = True
+                    logging.debug("CULLING MESSAGE: %s WITH TIME %d TTL: %d" % (str(msg), t, self.msg_ttl))
 
                 if expired == False:
                     newvalues.append(str(msg))  
@@ -50,7 +51,6 @@ class storage(ForgetfulStorage):
             
             
     def __setitem__(self, key, value):
-        self.cull_msgs()
         logging.debug("ADDING %s to storage" % (value))
         
         if key in self.data:
