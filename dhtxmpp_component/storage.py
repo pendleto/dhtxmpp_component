@@ -5,22 +5,62 @@ Created on Sep 14, 2018
 '''
 import logging
 import time
+from itertools import takewhile
+import operator
+from collections import OrderedDict
 from dhtxmpp_component.protocol import protocol
-from kademlia.storage import ForgetfulStorage
+from kademlia.storage import IStorage
 
-class storage(ForgetfulStorage):
+class storage(IStorage):
 
     def __init__(self, ttl=3600):
         """
         By default, max age is an hour.
         """
         self.msg_ttl = ttl
-        ForgetfulStorage.__init__(self, ttl)
-        
+        self.data = OrderedDict()
+        self.ttl = ttl
+
+    def cull(self):
+        logging.debug("CULLING storage START")
+        for _, _ in self.iteritemsOlderThan(self.ttl):
+            self.data.popitem(last=False)
+        self.cull_msgs()
+        logging.debug("CULLING storage COMPLETE")
+
+    def get(self, key, default=None):
+        if key in self.data:
+            return self[key]
+        return default
+
+    def __getitem__(self, key):
+        return self.data[key][1]
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __repr__(self):
+        return repr(self.data)
+
+    def iteritemsOlderThan(self, secondsOld):
+        minBirthday = time.time() - secondsOld
+        zipped = self._tripleIterable()
+        matches = takewhile(lambda r: minBirthday >= r[1], zipped)
+        return list(map(operator.itemgetter(0, 2), matches))
+
+    def _tripleIterable(self):
+        ikeys = self.data.keys()
+        ibirthday = map(operator.itemgetter(0), self.data.values())
+        ivalues = map(operator.itemgetter(1), self.data.values())
+        return zip(ikeys, ibirthday, ivalues)
+
+    def items(self):
+        ikeys = self.data.keys()
+        ivalues = map(operator.itemgetter(1), self.data.values())
+        return zip(ikeys, ivalues)
         
     def cull_msgs(self):
-        logging.debug("CULLING storage START")
-        ForgetfulStorage.cull(self)
+ 
         newkeyvals = []
         for key in self.data.keys():
             value = self.data[key][1]
@@ -46,9 +86,7 @@ class storage(ForgetfulStorage):
             key = kv[0]
             v = kv[1]
             del self.data[key]       
-            ForgetfulStorage.__setitem__(self, key, v)
-        logging.debug("CULLING storage COMPLETE")
-            
+            self.__setitem__(key, v)
             
     def __setitem__(self, key, value):
         logging.debug("ADDING %s to storage" % (value))
@@ -76,4 +114,6 @@ class storage(ForgetfulStorage):
         else:
             newvalue = value
             
-        ForgetfulStorage.__setitem__(self, key, newvalue)
+        if key in self.data:
+            del self.data[key]
+        self.data[key] = (time.time(), newvalue)

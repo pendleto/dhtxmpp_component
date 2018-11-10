@@ -39,7 +39,7 @@ class server(Server):
 
         # cull old messages
         
-        self.storage.cull_msgs()
+        self.storage.cull()
         # now republish keys older than one hour
         for dkey, value in self.storage.iteritemsOlderThan(3600):
             await self.set_digest(dkey, str(value))

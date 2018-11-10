@@ -11,14 +11,11 @@ import logging
 import asyncio
 import threading
 import time
-
+import sleekxmpp.plugins.xep_0184 as xep_0184
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp import JID, jid
-from sleekxmpp.xmlstream.handler import Callback
-from sleekxmpp.xmlstream.matcher import StanzaPath
-
 from collections import Counter
-
+from xml.etree import cElementTree as ET
 from dhtxmpp_component.protocol import protocol, dhtxmpp_protocol_msg
 from dhtxmpp_component.dht import DHT
 from dhtxmpp_component.mdns import mdns_service
@@ -154,7 +151,17 @@ class dhtxmpp_component(ComponentXMPP):
                     self.parse_dht_msg(msg)
                 else:
                     logging.debug("NO PRESENCES FOUND FOR %s" % (str(msg_key)))
-                 
+ 
+ 
+                msg_key = protocol.create_msg_key(str(self.local_jid.user), dhtxmpp_protocol_msg.msg_type_msg_rcpt)
+                logging.debug("GETTING ALL MESSAGE RECEIPTS FOR %s" % (str(msg_key)))
+                msg = await self.get_msg_from_dht(msg_key)
+        
+                if msg != None:
+                    self.parse_dht_msg(msg)
+                else:
+                    logging.debug("NO MESSAGE RECEIPTS FOUND FOR %s" % (str(msg_key)))
+                                    
         logging.debug("SCHEDULERQUEUE QSIZE=%d" % self.scheduler.addq.qsize())
         logging.debug("EVENTQUEUE QSIZE=%d" % self.event_queue.qsize())
         logging.debug("SENDQUEUE QSIZE=%d" % self.send_queue.qsize())
@@ -312,10 +319,25 @@ class dhtxmpp_component(ComponentXMPP):
         
         if self.local_jid != None:
             logging.debug("Sending message %s" % pmsg.msg_body)
-            self.send_message(mto=self.local_jid,
+               
+            msg = self.make_message(mto=self.local_jid,
                           mfrom=from_jid,
                           mbody=pmsg.msg_body,
                           mtype='chat')
+                     
+            #rcpt = xep_0184.Request(parent=msg)
+            #rcpt.setup()
+            #rcpt.set_request_receipt(pmsg.msg_id)
+            msg.appendxml(ET.Element("request xmlns='urn:xmpp:receipts'"))
+            self.send(msg)
+
+            # send message receipt to dht
+            to_user_key = protocol.create_user_key(str(from_jid.user))
+            from_user_key = protocol.create_user_key(str(self.local_jid.user))   
+            logging.debug("SENDING RECEIPT MESSAGE TO KEY: %s" % (str(to_user_key)))
+            fullmsg = dhtxmpp_protocol_msg.create_msg_rcpt_str(from_user_key, to_user_key, pmsg.msg_id)
+            msg_key = protocol.create_msg_key(str(from_jid.user), dhtxmpp_protocol_msg.msg_type_msg_rcpt)
+            self.send_msg_to_dht(msg_key, fullmsg) 
         else:
             logging.debug ("Could not send message because local_jid was not set")
             return False
@@ -336,6 +358,24 @@ class dhtxmpp_component(ComponentXMPP):
         #else:
         #   logging.debug ("Could not send unavailable presence because local_jid was not set")   
   
+    def on_msg_rcpt_from_dht(self, from_jid, pmsg):
+  
+        if self.local_jid != None:                        
+            logging.debug("Sending receipt message")
+            msg = self.make_message(mto=self.local_jid, mfrom=from_jid)
+            msg.appendxml(ET.Element("received xmlns='urn:xmpp:receipts' id='%s'" % (pmsg.msg_id)))
+            #rcv = xep_0184.Received(parent=msg)
+            #rcv.setup()
+            #rcv.set_receipt(pmsg.id)
+            #msg.append(rcv)
+            self.send(msg)
+        else:
+            logging.debug ("Could not send message rcpt because local_jid was not set")
+            return False
+        
+        return True            
+        
+        
     async def get_roster_presence(self):
         groups = self.client_roster.groups()
         for group in groups:
@@ -410,9 +450,15 @@ class dhtxmpp_component(ComponentXMPP):
     def send_msg_to_dht(self, to, msg):
         logging.debug("SETTING DHT MSG TO %s" % (str(to)))
         key = to #hashlib.sha1(str(to).encode('utf-8')).digest() 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(self.dht.set(key, str(msg)))
+        try:
+            loop = asyncio.get_event_loop()
+            result = asyncio.ensure_future(self.dht.set(key, str(msg)), loop=loop)
+        except:
+            loop = asyncio.new_event_loop()
+            result = loop.run_until_complete(self.dht.set(key, str(msg)))
+            
+        
+        #
         return result
  
     async def get_msg_from_dht(self, jid):
@@ -443,18 +489,18 @@ class dhtxmpp_component(ComponentXMPP):
                                 self.last_msg_delivery_time_epoch[from_jid] = pmsg.time_epoch
                             
                 elif msg_type == dhtxmpp_protocol_msg.msg_type_msg_rcpt:              
-                    logging.debug("XMPP MESSAGE RECIPT TYPE TO %s LOCAL %s" % (pmsg.to_user_key, self.local_user_key))               
+                    logging.debug("XMPP MESSAGE RECEIPT TYPE TO %s LOCAL %s" % (pmsg.to_user_key, self.local_user_key))               
                     # if this msg is destined for this node
                     if (pmsg.to_user_key == self.local_user_key):
                         from_jid = create_jid(pmsg.from_user_key)
                         # if last delivery time from this jid < current msg time
                         if pmsg.time_epoch > self.last_msg_rcpt_delivery_time_epoch.get(from_jid, 0):
-                            self.last_msg_rcpt_delivery_time_epoch[from_jid] = pmsg.time_epoch
+                            retval = self.on_msg_rcpt_from_dht(from_jid, pmsg)
                             
-                            logging.debug("Sending receipt message")
-                            msg = self.make_message(mto=self.local_jid, mfrom=from_jid)
-                            msg['id'] = pmsg.msgid
-                            self.send(msg)                                 
+                            if retval == True:
+                                self.last_msg_rcpt_delivery_time_epoch[from_jid] = pmsg.time_epoch
+
+                                                            
                 elif msg_type == dhtxmpp_protocol_msg.msg_type_prs:    
                     # if this msg is not from this node                
                     if (pmsg.from_user_key != self.local_user_key):

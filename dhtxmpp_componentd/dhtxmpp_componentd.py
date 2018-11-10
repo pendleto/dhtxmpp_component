@@ -25,6 +25,8 @@ class dhtxmpp_componentd:
         logging.debug("Connecting to XMPP server...")
         if xmpp.connect():
             logging.debug("Connected")
+            xmpp.use_message_ids = True
+            xmpp.use_presence_ids = True
             xmpp.process(block=False)
             xmpp.run()
             xmpp.disconnect()
